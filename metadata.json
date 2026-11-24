@@ -1,0 +1,6 @@
+{
+  "name": "Venky Analytics OS",
+  "description": "AI-powered personal analytics workstation supporting SQL Studio, Excel Studio, sandboxed Python notebooks, Statistics Lab, Power BI modeling, Data Cleaning, Business Analysis, Reporting, Projects, and Career Prep across 14 analyst roles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
