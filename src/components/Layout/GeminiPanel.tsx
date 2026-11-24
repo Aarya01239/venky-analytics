@@ -5,11 +5,14 @@ import { Copy, Check, Send, Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { AiLanguage, AiMode } from '../../types/os';
 
+import { offlinePractice } from '../../utils/offlineTutor';
+import { speak, stopSpeech } from '../../utils/browserSpeech';
+
 interface ChatMsg {
   id: string;
   role: 'user' | 'model';
   text: string;
-  error?: boolean;
+  source?: string;
 }
 
 const AI_MODES: { id: AiMode; label: string }[] = [
@@ -65,6 +68,14 @@ export const GeminiPanel: React.FC = () => {
     clearPendingAiPrompt,
   } = useWorkspace();
 
+  const [provider, setProvider] = useState<'auto' | 'gemini' | 'offline'>('auto');
+  const [speechStatus, setSpeechStatus] = useState('');
+  const [speechRate, setSpeechRate] = useState(0.9);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!aiOpen) stopSpeech();
+    return stopSpeech;
+  }, [aiOpen]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -73,56 +84,56 @@ export const GeminiPanel: React.FC = () => {
 
   const sendPrompt = async (promptText: string) => {
     const trimmed = promptText.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || inFlight.current) return;
 
     const userMsg: ChatMsg = { id: `u_${Date.now()}`, role: 'user', text: trimmed };
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
     setInput('');
+    const addReply = (text: string, source: string) => {
+      setMessages(prev => [...prev, { id: `m_${Date.now()}`, role: 'model', text, source }]);
+    };
+    if (provider !== 'gemini') {
+      addReply(offlinePractice(aiContext.module, aiLanguage), 'Offline practice · curated module exercise');
+      return;
+    }
+    inFlight.current = true;
     setSending(true);
 
     try {
       const res = await fetch('/api/ai/assist', {
         method: 'POST',
+        signal: AbortSignal.timeout(25_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: trimmed,
           mode: aiMode,
           language: aiLanguage,
           context: aiContext,
-          history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+          history: messages.filter(message => !message.source || message.source === 'Gemini AI').slice(-6).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Gemini AI request failed.');
       }
-      setMessages((prev) => [
-        ...prev,
-        { id: `m_${Date.now()}`, role: 'model', text: data.text || 'No response received.' },
-      ]);
-    } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `e_${Date.now()}`,
-          role: 'model',
-          text: err?.message || 'Could not reach Gemini AI backend.',
-          error: true,
-        },
-      ]);
+      if (typeof data.text !== 'string' || !data.text.trim()) throw new Error('Empty Gemini response');
+      addReply(data.text, 'Gemini AI');
+    } catch {
+      addReply(offlinePractice(aiContext.module, aiLanguage), 'Gemini unavailable · curated offline exercise');
     } finally {
+      inFlight.current = false;
       setSending(false);
     }
   };
 
   useEffect(() => {
-    if (aiOpen && pendingAiPrompt) {
+    if (aiOpen && pendingAiPrompt && !sending) {
       const p = pendingAiPrompt;
       clearPendingAiPrompt();
       sendPrompt(p);
     }
-  }, [aiOpen, pendingAiPrompt]);
+  }, [aiOpen, pendingAiPrompt, sending]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -139,12 +150,13 @@ export const GeminiPanel: React.FC = () => {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           <h2 className="font-display font-semibold text-sm text-slate-900 dark:text-slate-100">
-            Gemini Analytics Assistant
+            Analytics Tutor
           </h2>
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setMessages([])}
+            disabled={sending}
+            onClick={() => { stopSpeech(); setMessages([]); }}
             title="Clear conversation"
             className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
@@ -162,6 +174,17 @@ export const GeminiPanel: React.FC = () => {
 
       {/* Mode & Language Controls */}
       <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/70 dark:bg-[#0B111A]/60">
+        <label className="block text-xs">
+          Provider <select className="ml-2 bg-transparent" value={provider} onChange={event => setProvider(event.target.value as typeof provider)}>
+            <option value="auto">Auto (offline)</option>
+            <option value="gemini">Gemini (send workspace context)</option>
+            <option value="offline">Offline practice</option>
+          </select>
+        </label>
+        <p className="text-xs text-slate-500">Gemini sends context to Google and can use API quota. Auto keeps your practice in this browser.</p>
+        <label className="text-xs">Playback speed <input aria-label="Playback speed" type="range" min="0.6" max="1.4" step="0.1" value={speechRate} onChange={event => setSpeechRate(Number(event.target.value))} /></label>
+        <button className="ml-2 text-xs underline" onClick={stopSpeech}>Stop playback</button>
+        <p role="status" className="text-xs">{speechStatus}</p>
         <div className="flex items-center gap-1 overflow-x-auto">
           {AI_MODES.map((m) => (
             <button
@@ -223,8 +246,6 @@ export const GeminiPanel: React.FC = () => {
               className={`text-[13px] leading-relaxed ${
                 m.role === 'user'
                   ? 'ml-8 px-3 py-2 rounded-lg bg-blue-600 text-white'
-                  : m.error
-                  ? 'px-3 py-2 rounded-lg border border-red-300 dark:border-red-900/70 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300'
                   : 'text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800/80 pb-3'
               }`}
             >
@@ -232,10 +253,15 @@ export const GeminiPanel: React.FC = () => {
                 <div className="whitespace-pre-wrap">{m.text}</div>
               ) : (
                 <div>
+                  <p className="mb-1 text-xs text-slate-500">{m.source}</p>
                   <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:p-2.5 prose-pre:rounded-md prose-code:text-blue-600 dark:prose-code:text-blue-300 prose-table:text-xs">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                   </div>
-                  <div className="mt-2 flex items-center justify-end">
+                  <div className="mt-2 flex items-center justify-end gap-3">
+                    <button className="text-xs underline" onClick={() => {
+                      setSpeechStatus('');
+                      speak(m.text, /[\u0C00-\u0C7F]/.test(m.text) ? 'te' : 'en', speechRate, setSpeechStatus);
+                    }}>Read aloud</button>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(m.text);
