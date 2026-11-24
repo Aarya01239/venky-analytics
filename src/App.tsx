@@ -25,10 +25,15 @@ import { PortfolioBuilderModule } from './modules/PortfolioBuilderModule';
 import { FileManagerModule } from './modules/FileManagerModule';
 import { NotesResourcesModule, SettingsModule } from './modules/NotesSettingsModule';
 
+const SkillsPracticeModule = React.lazy(() => import('./modules/SkillsPracticeModule').then(m => ({ default: m.SkillsPracticeModule })));
+
 const WorkstationShell: React.FC = () => {
   const { loading, error, activeModule, refreshWorkspace } = useWorkspace();
 
+  const [skillsOpen, setSkillsOpen] = React.useState(false);
+  React.useEffect(() => { setSkillsOpen(false); }, [activeModule]);
   const renderModule = () => {
+    if (skillsOpen) return <React.Suspense fallback={<p className="p-6">Loading practice lab...</p>}><SkillsPracticeModule /></React.Suspense>;
     switch (activeModule) {
       case 'dashboard':
         return <DashboardModule />;
@@ -113,6 +118,7 @@ const WorkstationShell: React.FC = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar />
+        <div className="px-3 py-1 border-b border-slate-300 dark:border-slate-700"><button className="text-sm text-blue-500" onClick={() => setSkillsOpen(v => !v)}>{skillsOpen ? 'Return to workspace' : 'Keyboard Skills Lab'}</button></div>
         <main className="flex-1 overflow-y-auto">{renderModule()}</main>
       </div>
       <GeminiPanel />
