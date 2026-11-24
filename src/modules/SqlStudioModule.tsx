@@ -168,7 +168,7 @@ export const SqlStudioModule: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userSql: activeTab.sql,
-          solutionSql: activeChallenge.solutionSql,
+          challengeId: activeChallenge.id,
           dialect: activeTab.dialect,
         }),
       });

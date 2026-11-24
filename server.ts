@@ -14,8 +14,11 @@ import {
   seedInitialWorkspace,
   translateDialectSql,
   validateUserSqlSafety,
+  withReadOnlySnapshot,
 } from './server/db.ts';
 import { runGeminiAssistant } from './server/gemini.ts';
+import { SQL_CHALLENGES } from './src/data/curriculum.ts';
+import type { Database } from 'sql.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -477,27 +480,44 @@ app.post('/api/sql/execute', async (req, res) => {
   }
 });
 
-// Auto-evaluate SQL challenge against a reference SQL query on the real database
+// Grade against the registered reference using a disposable snapshot.
+function selectForGrading(db: Database, sql: string) {
+  const statement = db.prepare(sql);
+  try {
+    const columns = statement.getColumnNames();
+    const values = [];
+    while (statement.step()) {
+      if (values.length >= 5000) throw new Error('Challenge output exceeds 5,000 rows.');
+      values.push(statement.get());
+    }
+    return { columns, values };
+  } finally {
+    statement.free();
+  }
+}
+
 app.post('/api/sql/evaluate', async (req, res) => {
   try {
-    const { userSql, solutionSql, dialect = 'sqlite' } = req.body;
-    const safetyErr = validateUserSqlSafety(userSql || '');
+    const { userSql, challengeId, dialect = 'sqlite' } = req.body;
+    const challenge = SQL_CHALLENGES.find(item => item.id === challengeId);
+    if (!challenge || typeof userSql !== 'string' || userSql.length > 16_000) {
+      res.status(400).json({ passed: false, feedback: 'Select a registered challenge and enter a query under 16,000 characters.' });
+      return;
+    }
+    const { sql: cleanUser } = translateDialectSql(userSql, dialect);
+    if (!/^\s*(?:select|with)\b/i.test(cleanUser)) {
+      res.status(400).json({ passed: false, feedback: 'Start the challenge query with SELECT or WITH.' });
+      return;
+    }
+    const safetyErr = validateUserSqlSafety(cleanUser);
     if (safetyErr) {
       res.status(403).json({ passed: false, feedback: safetyErr });
       return;
     }
-    const db = await getDb();
-    const { sql: cleanUser } = translateDialectSql(userSql, dialect);
-    const userRes = db.exec(cleanUser);
-    const solRes = db.exec(solutionSql);
-
-    if (!userRes.length) {
-      res.json({ passed: false, feedback: 'Your query returned no result set. Make sure it outputs rows via SELECT.' });
-      return;
-    }
-
-    const u = userRes[0];
-    const s = solRes[0];
+    const [u, s] = await withReadOnlySnapshot(db => [
+      selectForGrading(db, cleanUser),
+      selectForGrading(db, challenge.solutionSql),
+    ]);
 
     const normalizeRows = (vals: any[][]) =>
       vals.map((row) =>

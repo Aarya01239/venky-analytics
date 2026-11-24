@@ -561,6 +561,18 @@ export async function getDb(): Promise<Database> {
   return initPromise;
 }
 
+export async function withReadOnlySnapshot<T>(run: (snapshot: Database) => T): Promise<T> {
+  const db = await getDb();
+  const SQL = await initSqlJs();
+  const snapshot = new SQL.Database(db.export());
+  try {
+    snapshot.run('PRAGMA query_only = ON');
+    return run(snapshot);
+  } finally {
+    snapshot.close();
+  }
+}
+
 export function queryAll(db: Database, sql: string, params: any[] = []): Record<string, any>[] {
   const stmt = db.prepare(sql);
   try {
