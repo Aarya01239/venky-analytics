@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, Download, Trash2, Database, Eye, Check } from 'lucide-react';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { SyntheticDatasetGenerator } from './SyntheticDatasetGenerator';
 import { exportRowsToCsv, exportRowsToXlsx, exportJsonFile } from '../utils/exporters';
 
 export const FileManagerModule: React.FC = () => {
@@ -107,6 +108,8 @@ export const FileManagerModule: React.FC = () => {
           {uploadError}
         </div>
       )}
+
+      <SyntheticDatasetGenerator />
 
       {/* Dataset Catalog Table */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F1722] overflow-x-auto">
