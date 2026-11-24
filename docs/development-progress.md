@@ -7,6 +7,7 @@
 - Added explicit Gemini selection, no-key fallback, and curated offline guidance in English, Telugu script, and Romanized Telugu. Auto mode uses the curated guidance, so opening the tutor never triggers a paid request.
 - Expanded the Keyboard Skills Lab with more drills, raw WPM and accuracy that counts corrected mistakes. Browser-reserved shortcuts use a button-based simulation. The existing typing score history key is retained.
 - Split studio code into on-demand chunks. Added a deterministic synthetic JSON generator in File Manager for sales, merchant payments and marketing, including an optional dirty-data mode.
+- Added Career Prep with a browser-local application tracker and manual phrase matching for a job description and resume. Practice studios remain accessible when the workspace API fails while the site assets are reachable.
 - Updated SQL challenge grading to use the registered reference and a disposable SQLite snapshot.
 
 ## Verification and compatibility
@@ -14,7 +15,7 @@
 - Runtime used for validation: Node 24.22.3, Bun 1.4.5, and headless Chromium. The frozen Bun lock installed successfully. Plain npm installation hit the existing Vite/esbuild peer dependency mismatch. Use the Bun lock for reproducibility.
 - TypeScript check and production Vite build passed. A production Express process started with a fresh temporary data directory.
 - Chromium desktop and 390 px mobile tests exercised navigation, typing completion and stored history, keyboard detection and simulation, the speaking timer and editable transcript, and the curated fallback after the Gemini endpoint returned HTTP 503 without a key.
-- The same smoke run verified SQLite aggregation, a correct registered challenge, unknown challenge rejection, deterministic synthetic payment JSON with duplicates and missing values, and successful JSON re-import.
+- The same smoke run verified a HyperFormula calculation, SQLite aggregation, a correct registered challenge, unknown challenge rejection, deterministic synthetic payment JSON with duplicates and missing values, successful JSON re-import, job tracker persistence and keyword gaps, and a workspace startup failure with continued typing access. The backup rehearsal stopped the server, copied the isolated SQLite database, passed `PRAGMA integrity_check`, restarted against the copy, and found the saved lesson progress and generated dataset.
 - Gzip estimates from Vite put the entry JS chunk at approximately 138 kB, down from 869 kB before code splitting on the repaired baseline. The dashboard's shared chart chunk adds about 120 kB. These are build estimates. Network compression, slow-network timings and real-device transfer remain unmeasured. Excel and export chunks still trigger Vite's large-chunk warning.
 - Real microphone recognition, audible speech and Telugu voice inventories require testing with actual browsers and a microphone. The available Telugu voices depend on the device. The studio uses turn-by-turn browser transcription and displays a self-review rubric. It provides no pronunciation score.
 - Browser AI weights, Gemini success with an API key, Pyodide downloads, full analytics regression coverage and offline reload remain unverified or pending. No model assets were added.
@@ -23,9 +24,9 @@
 
 This is a single-workspace Express service with one in-memory SQLite instance and disk snapshots. Use a single service instance, a durable writable volume, and an HTTPS access gateway that authenticates users before granting access to both the website and API routes. A static-only host cannot serve the API. A short-lived container filesystem cannot retain the database. Keep Gemini disabled unless the authenticated host has quota controls.
 
-Back up by stopping the service cleanly and copying the configured `SQLITE_DB_PATH`, or `$DATA_DIR/venky_os.sqlite` when no override is set, to a protected location. Verify with SQLite `PRAGMA integrity_check` in a maintenance environment. For recovery, back up the current file first, stop the service, restore the verified file to that same path with the correct ownership, and restart. Confirm health and a known dataset or project before resuming use. Browser typing history lives in local storage and is outside the SQLite backup. Communication transcripts are session-only.
+Back up by stopping the service cleanly and copying the configured `SQLITE_DB_PATH`, or `$DATA_DIR/venky_os.sqlite` when no override is set, to a protected location. Verify with SQLite `PRAGMA integrity_check` in a maintenance environment. For recovery, back up the current file first, stop the service, restore the verified file to that same path with the correct ownership, and restart. Confirm health and a known dataset or project before resuming use. Browser typing history and career applications live in local storage and are outside the SQLite backup. Communication transcripts are session-only.
 
-Direct AI Studio synchronization was unavailable in this run. In the original AI Studio project, inspect its GitHub integration and branch selection. Use `development/learning-studios` if that interface supports switching to the development branch. If the integration tracks only `main`, review the branch changes and merge through GitHub after validation, then refresh the linked AI Studio app. Before deploying, confirm the tracked commit, configured Secrets, authentication and persistent storage. The exact AI Studio controls and the deployment were unverified.
+The available Sites runtime accepts static output or a Worker fetch handler. The existing Express server writes SQLite snapshots to a local filesystem, so that host would require an API and storage migration. Direct AI Studio synchronization was unavailable in this run. In the original AI Studio project, inspect its GitHub integration and branch selection. Use `development/learning-studios` if that interface supports switching to the development branch. If the integration tracks only `main`, review the branch changes and merge through GitHub after validation, then refresh the linked AI Studio app. Before deploying, confirm the tracked commit, configured Secrets, authentication and persistent storage. The exact AI Studio controls and the deployment were unverified.
 
 ## Continuation
 
@@ -33,3 +34,8 @@ Direct AI Studio synchronization was unavailable in this run. In the original AI
 2. Mount only selected datasets in Python, load libraries when required, and test Python execution and exports. Validate Excel formulas and workbook persistence.
 3. Add adaptive keyboard drills and durable practice histories, then extend the existing learning, interview, analytics and project modules using the acceptance checklist.
 4. Add private hosting, access controls, rate limits, and a restore rehearsal. Verify deployment before releasing a URL.
+
+
+## Repeatable smoke test
+
+From the checkout with the production build ready, run `python tests/smoke_browser.py` using a Python environment with Playwright and Chromium installed. Set `CHROMIUM_EXECUTABLE` to use a specific Chromium build if needed. The suite uses port 4317, a temporary database, and an explicitly empty Gemini key. See [dependency inventory](dependencies.md) for the direct package licenses.

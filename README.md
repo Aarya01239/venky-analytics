@@ -43,6 +43,8 @@ Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. 
 
 Open **Analytics Tutor** for curated guidance or select **Gemini** to send the active workspace context to the configured API. Gemini API quotas and billing are separate from consumer Gemini subscriptions. Leave the key unset to run without provider access.
 
+Open **Career Prep** to track job applications on this browser and compare exact phrases across a posting and your resume.
+
 Open **File Manager → Generate a synthetic dataset** to create practice JSON locally. Upload the file in File Manager to use it in the analytics modules.
 
 See the [development checkpoint](docs/development-progress.md) for the runtime, measured build sizes, test evidence, hosting requirements and backup instructions. The [acceptance checklist](docs/master-feature-checklist.md) tracks the remaining product work.
