@@ -258,10 +258,13 @@ export const GeminiPanel: React.FC = () => {
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                   </div>
                   <div className="mt-2 flex items-center justify-end gap-3">
-                    <button className="text-xs underline" onClick={() => {
-                      setSpeechStatus('');
-                      speak(m.text, /[\u0C00-\u0C7F]/.test(m.text) ? 'te' : 'en', speechRate, setSpeechStatus);
-                    }}>Read aloud</button>
+                    {([...new Set(m.text.split('\n').filter(line => line.trim()).map(line => /[\u0C00-\u0C7F]/.test(line) ? 'te' : 'en'))] as ('te' | 'en')[]).map(language => (
+                      <button key={language} className="text-xs underline" onClick={() => {
+                        setSpeechStatus('');
+                        const text = m.text.split('\n').filter(line => /[\u0C00-\u0C7F]/.test(line) === (language === 'te')).join('\n');
+                        speak(text, language, speechRate, setSpeechStatus);
+                      }}>{language === 'te' ? 'Play Telugu' : 'Read aloud'}</button>
+                    ))}
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(m.text);
