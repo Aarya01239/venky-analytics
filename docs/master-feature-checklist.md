@@ -41,3 +41,37 @@ All items are targets, not verified completion. Mark complete only with test evi
 - [ ] Typecheck, build, browser regression, AI failure tests, deployment and documented limitations
 
 Read development-requirements.md as well. Keep untested features unchecked; do not merge untested code. Free hosting, voice quality and browser AI performance depend on actual platform limits.
+
+## Development branch acceptance status
+
+Statuses apply to the slice described. Parent checkboxes stay open when work remains. Test details, runtime instructions and the continuation checkpoint are in [Development checkpoint](development-progress.md).
+
+| Requirement | Status and evidence | Remaining work |
+|---|---|---|
+| Existing code, branch and data | Implemented and tested for clean checkout. Source catalogs now tracked. TypeScript, build and isolated production boot passed. | Original untracked AI Studio content is unavailable from reachable Git history. Full regression and merge pending. |
+| Typing Studio | Partially implemented. `SkillsPracticeModule.tsx` provides English, business email, SQL, Python, Excel, home row and numeric drills. Chromium exercised raw WPM, corrected mistake accuracy and history. | Full lessons, symbols, finger placement, timed tests, consistency, heatmaps, adaptive practice, goals, charts and advanced progression. |
+| Shortcut Studio | Partially implemented. `SkillsPracticeModule.tsx` captures a focused shortcut and offers reserved-key simulation. Chromium verified both and Tab navigation. | Search, coverage across all apps, simultaneous/timed tasks, reaction time, difficulty, weak shortcuts and persistent mastery. |
+| Hybrid AI | Partially implemented. `GeminiPanel.tsx`, `offlineTutor.ts` and existing server adapter. Chromium verified missing-key fallback. | Open-source browser model, hardware/download consent and cache, automatic provider availability, quota and success checks. |
+| Contextual tutor | Partially implemented. Existing context goes to explicitly selected Gemini. Offline exercises use active module and language. | Per-artifact contextual explanations in every module, tiered lessons, interactive hints and follow-up tests. |
+| Telugu/English voice teaching | Partially implemented. `browserSpeech.ts`, `GeminiPanel.tsx` and Communication Studio expose playback, speed, stop and Telugu transcript fallback. | Device voice verification, English immersion, context selection, voice questions and model voice support. |
+| Communication Studio | Partially implemented. `CommunicationStudioModule.tsx` implements prompts, turn-based browser transcription and editable responses, configurable timer and manual rubric. Text and timer were tested in Chromium. | Live voice, audio verification, pronunciation recognition, corrections, additional scenarios, daily routines and history. |
+| Excel | Implemented but unverified as existing functionality in `ExcelStudioModule.tsx`. | Validate formulas, multiple sheets, workbook import/export and persistence, pivots, formatting, validation and dashboards. |
+| SQL | Partially implemented. `SqlStudioModule.tsx`, `server.ts` and `curriculum.ts` cover native SQLite, dialect translations and seeded exercises. | More exercises, editor autocomplete, relationships, complete dialect coverage, history edge cases and query performance training. |
+| Python and notebooks | Implemented but unverified as existing functionality in `PythonStudioModule.tsx`. | Code/Markdown, package loading and persistence regression, on-demand files and packages, DataFrame workflows, SciPy and scikit-learn. |
+| Statistics and research | Implemented but unverified as existing functionality in `StatisticsLabModule.tsx`. | Test assumptions, effect size, inference, regression, experiment and research scenarios and answer validation. |
+| Power BI | Implemented but unverified as existing simulation in `PowerBiWorkspaceModule.tsx`. | Expand and verify DAX, model relationships, filter context, transformations and interactive reporting. |
+| Cleaning and visualization | Implemented but unverified as existing functionality in their studio modules. | Reversible cleaning, profiles, advanced charts, saved configurations and export regression. |
+| Business Analysis | Partially implemented. Existing BA workspace and testable-criteria lesson. | Full stakeholder, requirements, process mapping, Agile/Jira, UAT, traceability and scenario assessments. |
+| Specialized analytics | Partially implemented. Existing domain workspaces, 14 career tracks and three generator scenarios. | Expand product, marketing, customer, financial, supply chain, fintech, research, strategy and responsible automation practice and assessments. |
+| Dataset library | Partially implemented. Existing samples plus `SyntheticDatasetGenerator.tsx` for reproducible 20–1,000-row JSON with optional missing values, duplicates, format issues and outliers. | Approximately 150 scenarios, configurable schemas, related tables, business graders, provenance records and additional export options. |
+| Analyst job simulator | Not implemented. | Stakeholder requests, change events, deadlines, staged submissions, verbal delivery and rubric scoring. |
+| Interviews | Partially implemented. Existing studio uses the new starter catalog. Communication Studio includes behavioral practice. | Role and technical question banks, voice mock rounds, structured feedback and verified answer practice across modules. |
+| Career center | Partially implemented. Existing portfolio builder and 14 career tracks. | Resume and cover letter builder, explainable JD matching, skill gaps, application and interview trackers, LinkedIn guidance and export verification. |
+| Projects | Partially implemented. Existing project shell and one actionable starter blueprint. | Cover more tools, dedicated project evaluation, milestones, README and interview presentation guidance. |
+| Learning system | Partially implemented. Existing server progress and two starter lessons with quizzes. | Complete role-based sequences, spaced repetition, flashcards, daily and weekly targets, streaks and review metrics. |
+| Unified dashboard | Partially implemented. Existing dashboard builds with restored career and curriculum catalogs. | Studio-level metrics and next actions grounded in actual practice data. |
+| UI and accessibility | Partially implemented. Existing themes, search, navigation and browser mobile smoke test. | Phone and desktop coverage across all modules, assistive technology and accessibility audit. |
+| Persistence, backup, privacy and security | Partially implemented. Existing SQLite, separate browser history and documented manual backup procedure. | Restore rehearsal, user-facing backup, integrity checks, access controls and rate limits for hosted use. |
+| Performance and low data | Partially implemented. Studio splitting reduced the entry chunk. Tutor requires no automatic model download. | Optional offline caching, low-data setting, smaller export chunks, virtualized tables and network measurements. |
+| Public deployment and AI Studio sync | Blocked. No confirmed authenticated runtime with a durable volume and publishing access. | Verify eligible infrastructure, access boundary, volume, sync controls and the deployed URL. |
+| Testing and handoff | Partially implemented. See the checkpoint for verified tests and component-level gaps. | Complete regressions, accessibility, live devices, deployment, current host limits and full license inventory. |

@@ -29,8 +29,20 @@ APP_URL="http://localhost:3000"
 ## Local Development & Deployment
 
 ```bash
-npm install
+bun install --frozen-lockfile
 npm run dev      # Starts Express + Vite middleware on http://localhost:3000
 npm run build    # Production bundle into dist/
 npm run lint     # TypeScript type-check (tsc --noEmit)
+NODE_ENV=production npm start
 ```
+
+
+## Practice studios
+
+Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech.
+
+Open **Analytics Tutor** for curated guidance or select **Gemini** to send the active workspace context to the configured API. Gemini API quotas and billing are separate from consumer Gemini subscriptions. Leave the key unset to run without provider access.
+
+Open **File Manager → Generate a synthetic dataset** to create practice JSON locally. Upload the file in File Manager to use it in the analytics modules.
+
+See the [development checkpoint](docs/development-progress.md) for the runtime, measured build sizes, test evidence, hosting requirements and backup instructions. The [acceptance checklist](docs/master-feature-checklist.md) tracks the remaining product work.
