@@ -58,6 +58,14 @@ const shortcuts = [
   {app:'VS Code', task:'Toggle line comment', key:'/', ctrl:true, shift:false},
   {app:'VS Code', task:'Jump to line number', key:'g', ctrl:true, shift:false, reserved:true},
   {app:'VS Code', task:'Open Command Palette', key:'p', ctrl:true, shift:true, reserved:true},
+  {app:'Jupyter', task:'Run cell and stay in place', key:'enter', ctrl:true, shift:false},
+  {app:'Jupyter', task:'Run cell and insert below', key:'enter', ctrl:false, shift:false, alt:true},
+  {app:'Google Sheets', task:'Fill selected range', key:'enter', ctrl:true, shift:false},
+  {app:'Google Sheets', task:'Fill down', key:'d', ctrl:true, shift:false, reserved:true},
+  {app:'Google Sheets', task:'Paste values only', key:'v', ctrl:true, shift:true, reserved:true},
+  {app:'Google Sheets', task:'Show keyboard shortcuts', key:'/', ctrl:true, shift:false},
+  {app:'Google Sheets', task:'Open Tool finder', key:'/', ctrl:false, shift:false, alt:true},
+  {app:'Google Sheets', task:'Insert new sheet', key:'f11', ctrl:false, shift:true, reserved:true},
 ];
 const masteryLevels = ['Unpracticed', 'Learning', 'Mastered'] as const;
 type MasteryLevel = typeof masteryLevels[number];
@@ -68,7 +76,7 @@ function masteryFor(stats?: KeyCount): MasteryLevel {
 }
 
 function shortcutChord(shortcut: typeof shortcuts[number]) {
-  return [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
+  return [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.alt ? 'Alt' : '', shortcut.key.toUpperCase()].filter(Boolean);
 }
 
 const difficultyLevels = ['Beginner', 'Intermediate', 'Advanced'] as const;
@@ -325,7 +333,7 @@ export function SkillsPracticeModule() {
             if (!event.ctrlKey && !event.altKey && !event.metaKey) scoreShortcut(false);
             return;
           }
-          const matches = event.ctrlKey === shortcut.ctrl && event.shiftKey === shortcut.shift && !event.altKey && !event.metaKey;
+          const matches = event.ctrlKey === shortcut.ctrl && event.shiftKey === shortcut.shift && event.altKey === Boolean(shortcut.alt) && !event.metaKey;
           if (matches) {
             event.preventDefault();
             event.stopPropagation();

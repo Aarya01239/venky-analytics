@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Notebook and spreadsheet shortcuts
+
+- Added eight Jupyter and Google Sheets drills. The trainer now captures Alt combinations, including the Jupyter run-and-insert shortcut and Google Sheets Tool finder. Reserved or clipboard-related combinations use the on-screen simulation.
+- Chromium verifies `Alt+Enter` lookup and capture plus the `Ctrl+Shift+V` Sheets simulation.
+- References are [Jupyter Notebook keyboard shortcuts](https://jupyter-notebook.readthedocs.io/en/4.x/notebook.html#keyboard-shortcuts) and [Google Sheets keyboard shortcuts](https://support.google.com/docs/answer/181110?hl=en).
+
 ## Expanded shortcut library
 
 - Added seven Windows-oriented drills for Excel editing, fill and dates, and VS Code comments, line navigation and the Command Palette. Shortcuts that browsers may intercept use on-screen simulation.
