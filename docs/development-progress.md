@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Expanded shortcut library
+
+- Added seven Windows-oriented drills for Excel editing, fill and dates, and VS Code comments, line navigation and the Command Palette. Shortcuts that browsers may intercept use on-screen simulation.
+- Chromium verifies exact `Ctrl+/` lookup and capture plus the Excel Fill Down simulation.
+- Shortcut references are [Excel shortcuts](https://support.microsoft.com/en-us/accessibility/excel/keyboard-shortcuts-in-excel), [Excel Fill Down](https://support.microsoft.com/en-gb/excel/fill-a-formula-down-into-adjacent-cells), and [VS Code keyboard shortcuts for Windows](https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf).
+
 ## Shortcut difficulty
 
 - Shortcut Trainer groups exercises into Beginner (zero or one modifier), Intermediate (two modifiers), and Advanced (reserved shortcut simulation). The difficulty selector scopes the practice sequence, weakest-shortcut review, reference and mastery count.

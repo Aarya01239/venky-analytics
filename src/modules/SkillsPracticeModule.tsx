@@ -51,6 +51,13 @@ const shortcuts = [
   {app:'Google Sheets', task:'Find and replace (Windows)', key:'h', ctrl:true, shift:false, reserved:true},
   {app:'Google Docs', task:'Italicize selection', key:'i', ctrl:true, shift:false},
   {app:'Word', task:'Bold selected text', key:'b', ctrl:true, shift:false},
+  {app:'Excel', task:'Edit selected cell', key:'f2', ctrl:false, shift:false},
+  {app:'Excel', task:'Fill formula down', key:'d', ctrl:true, shift:false, reserved:true},
+  {app:'Excel', task:'Fill formula right', key:'r', ctrl:true, shift:false, reserved:true},
+  {app:'Excel', task:'Insert today’s date', key:';', ctrl:true, shift:false},
+  {app:'VS Code', task:'Toggle line comment', key:'/', ctrl:true, shift:false},
+  {app:'VS Code', task:'Jump to line number', key:'g', ctrl:true, shift:false, reserved:true},
+  {app:'VS Code', task:'Open Command Palette', key:'p', ctrl:true, shift:true, reserved:true},
 ];
 const masteryLevels = ['Unpracticed', 'Learning', 'Mastered'] as const;
 type MasteryLevel = typeof masteryLevels[number];
