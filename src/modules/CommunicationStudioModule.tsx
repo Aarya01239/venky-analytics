@@ -9,12 +9,34 @@ const scenarios = [
   ['Client call', 'Confirm the scope and deadline for a merchant retention report with a client.', 'Restate the deliverable, confirm the date and owner, and summarize the next step.'],
 ];
 
+interface PracticeSummary {
+  scenario: string;
+  date: string;
+  seconds: number;
+}
+
+const historyKey = 'vos.communication.history.v1';
+
+function readPracticeHistory(): PracticeSummary[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(historyKey) ?? '[]');
+    if (Array.isArray(saved)) {
+      return saved.filter(entry => entry && typeof entry.scenario === 'string' &&
+        typeof entry.date === 'string' && Number.isFinite(Date.parse(entry.date)) &&
+        Number.isInteger(entry.seconds) && entry.seconds > 0).slice(0, 20);
+    }
+  } catch { /* Practice can continue without local storage. */ }
+  return [];
+}
+
 const button = 'px-3 py-2 rounded-md border border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
 
 export function CommunicationStudioModule() {
   const [scenario, setScenario] = useState(0);
   const [minutes, setMinutes] = useState(40);
   const [endsAt, setEndsAt] = useState(0);
+  const [startedAt, setStartedAt] = useState(0);
+  const [history, setHistory] = useState(readPracticeHistory);
   const [remaining, setRemaining] = useState(0);
   const [rate, setRate] = useState(0.9);
   const [answer, setAnswer] = useState('');
@@ -40,6 +62,23 @@ export function CommunicationStudioModule() {
     }, 250);
     return () => window.clearInterval(timer);
   }, [endsAt]);
+
+  function finishSession() {
+    if (!startedAt) return;
+    const seconds = Math.max(0, Math.round((Math.min(Date.now(), startedAt + minutes * 60_000) - startedAt) / 1000));
+    setEndsAt(0);
+    setStartedAt(0);
+    setRemaining(0);
+    if (!seconds) return;
+    const next = [{ scenario: title, date: new Date().toISOString(), seconds }, ...history].slice(0, 20);
+    setHistory(next);
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(next));
+      setStatus('Practice time saved.');
+    } catch {
+      setStatus('Practice time is available until the page reloads. This browser blocked local storage.');
+    }
+  }
 
   function listen() {
     if (recognition.current) return;
@@ -84,14 +123,19 @@ export function CommunicationStudioModule() {
     <h1 className="text-2xl font-bold">Communication Studio</h1>
     <p className="text-sm">Listen to a prompt, speak your answer, then review the transcript against the practice rubric.</p>
     <div className="flex flex-wrap items-center gap-3">
-      <label>Session minutes <input className="w-16 border rounded bg-transparent p-1" type="number" min="1" max="120" value={minutes} onChange={event => setMinutes(event.target.valueAsNumber || 0)} disabled={!!endsAt} /></label>
+      <label>Session minutes <input className="w-16 border rounded bg-transparent p-1" type="number" min="1" max="120" value={minutes} onChange={event => setMinutes(event.target.valueAsNumber || 0)} disabled={!!startedAt} /></label>
       <button className={button} disabled={minutes < 1 || minutes > 120 || !Number.isInteger(minutes)} onClick={() => {
-        if (endsAt) { setEndsAt(0); setRemaining(0); }
-        else { setRemaining(minutes * 60); setEndsAt(Date.now() + minutes * 60_000); }
-      }}>{endsAt ? 'End timer' : 'Start session'}</button>
+        if (startedAt) finishSession();
+        else {
+          const now = Date.now();
+          setStartedAt(now);
+          setRemaining(minutes * 60);
+          setEndsAt(now + minutes * 60_000);
+        }
+      }}>{startedAt ? 'Save and end session' : 'Start session'}</button>
       <output aria-label="Time remaining">{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</output>
     </div>
-    <label className="block">Scenario <select className="border rounded bg-transparent p-1" disabled={listening} value={scenario} onChange={event => {
+    <label className="block">Scenario <select className="border rounded bg-transparent p-1" disabled={listening || !!startedAt} value={scenario} onChange={event => {
       setScenario(Number(event.target.value));
       setAnswer('');
       setFeedback(false);
@@ -120,5 +164,15 @@ export function CommunicationStudioModule() {
       </div>
       {feedback && <p className="p-3 border rounded">{rubric}</p>}
     </div>
+    <section className="space-y-2">
+      <h2 className="font-semibold">Recent practice</h2>
+      <p className="text-sm">History records elapsed session time. Transcripts stay in the current session.</p>
+      {history.length ? <ul className="divide-y">
+        {history.map(({ scenario, date, seconds }) => <li key={date} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
+          <span>{scenario} · {Math.floor(seconds / 60)}m {seconds % 60}s</span>
+          <time dateTime={date}>{new Date(date).toLocaleDateString()}</time>
+        </li>)}
+      </ul> : <p className="text-sm">Start and save a session to build your practice history.</p>}
+    </section>
   </section>;
 }

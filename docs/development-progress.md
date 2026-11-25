@@ -1,5 +1,12 @@
 # Development checkpoint
 
+## Second development pass
+
+- Python Studio starts with the Pyodide core. The worker loads Python packages required by the current cell. Saved cells using `pd`, `np` and `plt` aliases still receive the matching imports on demand.
+- Cell references such as `/workspace/retail_sales.csv` load only that registered CSV. The worker reuses CSVs until their dataset version changes or the kernel restarts. For paths constructed at runtime, select the dataset and use **Mount active CSV**. The workspace dashboard may still make its existing active-dataset request.
+- Communication Studio saves the most recent 20 explicitly saved sessions in the current browser. Each record contains the scenario, date and elapsed timer duration. Transcripts remain in memory and the app does not record audio.
+- TypeScript and production build passed. The browser suite verifies speaking history across reloads. Chromium ran real Pyodide 0.26.4 from local distribution assets. The core boot and a standard-library cell made no notebook CSV or wheel requests. A cell that read the retail CSV made one dataset request, and rerunning the cell reused the mounted CSV. Third-party scientific package downloads and live audio remain unverified.
+
 ## Delivered in this pass
 
 - Fixed the clean-checkout build by narrowing the SQLite data ignore rule and adding starter curriculum and career catalogs under `src/data/`. The original curriculum files were absent from the reachable Git history. The replacement includes 14 tracks, two lessons, two SQL challenges, two interview questions, and one project brief.
@@ -31,11 +38,11 @@ The available Sites runtime accepts static output or a Worker fetch handler. The
 ## Continuation
 
 1. Verify Gemini with a user-managed key and exercise the real microphone and Telugu voice on Chrome desktop and Android. Keep the curated approach available without a key.
-2. Mount only selected datasets in Python, load libraries when required, and test Python execution and exports. Validate Excel formulas and workbook persistence.
+2. Verify Pandas and Matplotlib downloads, plots and notebook exports over a live network. Validate additional Excel formulas and workbook persistence.
 3. Add adaptive keyboard drills and durable practice histories, then extend the existing learning, interview, analytics and project modules using the acceptance checklist.
 4. Add private hosting, access controls, rate limits, and a restore rehearsal. Verify deployment before releasing a URL.
 
 
 ## Repeatable smoke test
 
-From the checkout with the production build ready, run `python tests/smoke_browser.py` using a Python environment with Playwright and Chromium installed. Set `CHROMIUM_EXECUTABLE` to use a specific Chromium build if needed. The suite uses port 4317, a temporary database, and an explicitly empty Gemini key. See [dependency inventory](dependencies.md) for the direct package licenses.
+From the checkout with the production build ready, run `python tests/smoke_browser.py` using a Python environment with Playwright and Chromium installed. Set `CHROMIUM_EXECUTABLE` to use a specific Chromium build if needed. The suite uses port 4317, a temporary database, and an explicitly empty Gemini key. Optionally set `PYODIDE_ASSET_DIR` to the installed Pyodide 0.26.4 distribution to exercise browser-side Python and CSV requests without fetching the runtime from its CDN. See [dependency inventory](dependencies.md) for the direct package licenses.

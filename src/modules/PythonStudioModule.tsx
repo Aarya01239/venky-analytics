@@ -28,19 +28,7 @@ async function ensurePyodide() {
   pyodide = await loadPyodide({
     indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
   });
-  self.postMessage({ type: "status", message: "Loading NumPy, Pandas, and Matplotlib packages..." });
-  await pyodide.loadPackage(["numpy", "pandas", "matplotlib"]);
   pyodide.FS.mkdirTree("/workspace");
-  await pyodide.runPythonAsync(\`
-import os, sys, io, base64
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-pd.set_option('display.max_columns', 20)
-pd.set_option('display.width', 120)
-\`);
   initialized = true;
   self.postMessage({ type: "ready" });
   return pyodide;
@@ -60,10 +48,28 @@ self.onmessage = async (event) => {
     }
     if (type === "run") {
       const start = performance.now();
+      self.postMessage({ type: "status", message: "Loading packages required by this cell…" });
+      const aliases = [
+        ["pd", "import pandas as pd"],
+        ["np", "import numpy as np"],
+        ["plt", "import matplotlib.pyplot as plt"],
+      ];
+      const imports = aliases.filter(([alias]) => new RegExp("\\\\b" + alias + "\\\\s*\\\\.").test(code) && !py.globals.has(alias));
+      const prelude = imports.map(([, statement]) => statement).join("\\n");
+      await py.loadPackagesFromImports(prelude + "\\n" + code);
+      if (Object.hasOwn(py.loadedPackages, "matplotlib")) {
+        await py.runPythonAsync(\`
+import sys
+if "matplotlib.pyplot" not in sys.modules:
+    import matplotlib
+    matplotlib.use("Agg")
+\`);
+      }
+      if (prelude) await py.runPythonAsync(prelude);
       py.globals.set("__user_code__", code);
       const rawJson = await py.runPythonAsync(\`
 import io, sys, json, base64, traceback
-import matplotlib.pyplot as plt
+_pyplot = sys.modules.get("matplotlib.pyplot")
 
 _stdout = io.StringIO()
 _stderr = io.StringIO()
@@ -73,19 +79,22 @@ _images = []
 _err = ""
 
 def _capture_show(*args, **kwargs):
-    for num in plt.get_fignums():
-        fig = plt.figure(num)
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    for num in pyplot.get_fignums():
+        fig = pyplot.figure(num)
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
         buf.seek(0)
         _images.append("data:image/png;base64," + base64.b64encode(buf.read()).decode("utf-8"))
-    plt.close("all")
+    pyplot.close("all")
 
-plt.show = _capture_show
+if _pyplot:
+    _pyplot.show = _capture_show
 
 try:
     exec(compile(__user_code__, "<notebook_cell>", "exec"), globals())
-    if plt.get_fignums():
+    _pyplot = sys.modules.get("matplotlib.pyplot")
+    if _pyplot and _pyplot.get_fignums():
         _capture_show()
 except Exception:
     _err = traceback.format_exc()
@@ -110,7 +119,7 @@ json.dumps({
     }
   } catch (err) {
     self.postMessage({
-      type: "result",
+      type: type === "init" ? "boot-error" : "result",
       id,
       stdout: "",
       stderr: String(err && err.message ? err.message : err),
@@ -162,7 +171,7 @@ export const PythonStudioModule: React.FC = () => {
   ]);
 
   const [kernelState, setKernelState] = useState<'idle' | 'loading' | 'ready' | 'running' | 'error'>('idle');
-  const [kernelMsg, setKernelMsg] = useState('Click "Start Sandbox Kernel" or Run any cell to boot isolated CPython WASM.');
+  const [kernelMsg, setKernelMsg] = useState('Boot the kernel or run a cell to load Python. Libraries and CSVs load as needed.');
   const [mountedTables, setMountedTables] = useState<string[]>([]);
   const workerRef = useRef<Worker | null>(null);
   const timeoutRef = useRef<number | null>(null);
@@ -178,35 +187,29 @@ export const PythonStudioModule: React.FC = () => {
     }
   }, [notebooks, initializedNb]);
 
-  const mountAllDatasetsIntoWorker = async (worker: Worker) => {
-    const files: Record<string, string> = {};
-    const names: string[] = [];
-    // Mount all uploaded, cleaned, and sample datasets (up to 30 tables)
-    const targetList = datasets.slice(0, 30);
-    for (const ds of targetList) {
-      try {
-        const res = await fetch(`/api/datasets/${encodeURIComponent(ds.id)}/rows?limit=2000`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.rows?.length) {
-            files[`${ds.table_name}.csv`] = Papa.unparse(data.rows);
-            names.push(`${ds.table_name}.csv`);
-          }
-        }
-      } catch {
-        // skip single failed mount
-      }
-    }
-    worker.postMessage({ type: 'mount', files });
-    setMountedTables(names);
-  };
+  const mountedVersions = useRef(new Map<string, string>());
 
-  // Automatically sync newly uploaded/cleaned datasets when kernel is already running
-  useEffect(() => {
-    if (kernelState === 'ready' && workerRef.current && datasets.length > 0) {
-      mountAllDatasetsIntoWorker(workerRef.current);
+  async function mountDatasets(worker: Worker, tableNames: string[], refresh = false) {
+    const files: Record<string, string> = {};
+    const versions = new Map<string, string>();
+    for (const tableName of new Set(tableNames)) {
+      const dataset = datasets.find(item => item.table_name === tableName);
+      if (!dataset) continue;
+      const version = [dataset.id, dataset.version, dataset.updated_at].join(':');
+      if (!refresh && mountedVersions.current.get(tableName) === version) continue;
+      const response = await fetch(`/api/datasets/${encodeURIComponent(dataset.id)}/rows?limit=2000`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error(`Could not load ${tableName}.csv.`);
+      const data = await response.json();
+      files[`${tableName}.csv`] = Papa.unparse(data.rows ?? []);
+      versions.set(tableName, version);
     }
-  }, [datasets.length, kernelState]);
+    if (workerRef.current !== worker || !versions.size) return;
+    worker.postMessage({ type: 'mount', files });
+    for (const [table, version] of versions) mountedVersions.current.set(table, version);
+    setMountedTables([...mountedVersions.current.keys()]);
+  }
 
   const bootWorker = (): Promise<Worker> => {
     return new Promise((resolve, reject) => {
@@ -219,6 +222,7 @@ export const PythonStudioModule: React.FC = () => {
       const blob = new Blob([WORKER_SCRIPT], { type: 'application/javascript' });
       const url = URL.createObjectURL(blob);
       const worker = new Worker(url);
+      URL.revokeObjectURL(url);
       workerRef.current = worker;
 
       const onMsg = async (e: MessageEvent) => {
@@ -226,10 +230,17 @@ export const PythonStudioModule: React.FC = () => {
         if (data.type === 'status') {
           setKernelMsg(data.message);
         } else if (data.type === 'ready') {
-          await mountAllDatasetsIntoWorker(worker);
+          if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
           setKernelState('ready');
-          setKernelMsg('Isolated Python 3.12 Sandbox Ready (Pandas · NumPy · Matplotlib)');
+          setKernelMsg('Python 3.12 sandbox ready');
           resolve(worker);
+        } else if (data.type === 'boot-error') {
+          if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+          worker.terminate();
+          workerRef.current = null;
+          setKernelState('error');
+          setKernelMsg(data.stderr);
+          reject(new Error(data.stderr));
         } else if (data.type === 'result') {
           if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
           setCells((prev) =>
@@ -240,6 +251,7 @@ export const PythonStudioModule: React.FC = () => {
             )
           );
           setKernelState('ready');
+          setKernelMsg('Python 3.12 sandbox ready');
           updateAiContext({
             recentOutput: data.stderr ? `Python Error:\n${data.stderr}` : `Python stdout:\n${data.stdout}`,
           });
@@ -248,10 +260,23 @@ export const PythonStudioModule: React.FC = () => {
 
       worker.onmessage = onMsg;
       worker.onerror = (err) => {
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+        worker.terminate();
+        workerRef.current = null;
+        mountedVersions.current.clear();
+        setMountedTables([]);
         setKernelState('error');
         setKernelMsg(`Sandbox worker error: ${err.message}`);
         reject(err);
       };
+      timeoutRef.current = window.setTimeout(() => {
+        worker.terminate();
+        workerRef.current = null;
+        setKernelState('error');
+        const message = 'Python runtime download timed out. Check the connection and try again.';
+        setKernelMsg(message);
+        reject(new Error(message));
+      }, 60_000);
       worker.postMessage({ type: 'init' });
     });
   };
@@ -259,6 +284,8 @@ export const PythonStudioModule: React.FC = () => {
   useEffect(() => {
     return () => {
       workerRef.current?.terminate();
+      workerRef.current = null;
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -266,16 +293,21 @@ export const PythonStudioModule: React.FC = () => {
     if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     workerRef.current?.terminate();
     workerRef.current = null;
+    mountedVersions.current.clear();
+    setMountedTables([]);
     setKernelState('idle');
     setKernelMsg('Kernel terminated. Ready to boot fresh isolated Python sandbox.');
   };
 
   const runCell = async (cell: NotebookCell) => {
-    if (cell.type !== 'code') return;
+    if (cell.type !== 'code' || kernelState === 'loading' || kernelState === 'running') return;
     updateAiContext({ activeCode: cell.source });
     try {
       const worker = await bootWorker();
       setKernelState('running');
+      const tables = [...cell.source.matchAll(/\/workspace\/([a-zA-Z0-9_]+)\.csv\b/g)].map(match => match[1]);
+      await mountDatasets(worker, tables);
+      if (workerRef.current !== worker) return;
       // Enforce strict 25s execution timeout resource limit
       timeoutRef.current = window.setTimeout(() => {
         restartKernel();
@@ -288,8 +320,10 @@ export const PythonStudioModule: React.FC = () => {
         );
       }, 25000);
       worker.postMessage({ type: 'run', id: cell.id, code: cell.source });
-    } catch {
-      // handled in worker error
+    } catch (error) {
+      if (!workerRef.current) return;
+      setKernelState('ready');
+      setKernelMsg(error instanceof Error ? error.message : 'Could not load a notebook dataset.');
     }
   };
 
@@ -363,7 +397,7 @@ export const PythonStudioModule: React.FC = () => {
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => bootWorker()}
+            onClick={() => { void bootWorker().catch(() => undefined); }}
             disabled={kernelState === 'loading' || kernelState === 'ready' || kernelState === 'running'}
             className="px-3 py-1.5 rounded-md border border-slate-300 dark:border-slate-700 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
           >
@@ -410,10 +444,23 @@ export const PythonStudioModule: React.FC = () => {
           </span>
           {kernelState === 'ready' && workerRef.current && (
             <button
-              onClick={() => workerRef.current && mountAllDatasetsIntoWorker(workerRef.current)}
+              disabled={!activeDs}
+              onClick={async () => {
+                if (!activeDs || !workerRef.current) return;
+                const worker = workerRef.current;
+                setKernelState('running');
+                try {
+                  await mountDatasets(worker, [activeDs.table_name], true);
+                  if (workerRef.current === worker) setKernelMsg('Active CSV mounted');
+                } catch (error) {
+                  if (workerRef.current === worker) setKernelMsg(String(error));
+                } finally {
+                  if (workerRef.current === worker) setKernelState('ready');
+                }
+              }}
               className="ml-1 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:border-blue-500 text-slate-700 dark:text-slate-300"
             >
-              Sync CSVs
+              Mount active CSV
             </button>
           )}
         </div>
@@ -498,7 +545,7 @@ export const PythonStudioModule: React.FC = () => {
                   <>
                     <button
                       onClick={() => runCell(cell)}
-                      disabled={kernelState === 'running'}
+                      disabled={kernelState === 'loading' || kernelState === 'running'}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[11px] font-medium"
                     >
                       <Play className="w-3 h-3" />

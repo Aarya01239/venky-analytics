@@ -58,7 +58,12 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         page.get_by_label('Your transcript').fill('I track merchant leads.')
         page.get_by_role('button', name='Review rubric').click()
         expect(page.get_by_text('Start with your current role', exact=False)).to_be_visible()
-        page.get_by_role('button', name='End timer').click()
+        page.wait_for_timeout(1100)
+        page.get_by_role('button', name='Save and end session').click()
+        expect(page.get_by_role('listitem').filter(has_text='Self-introduction')).to_be_visible()
+        page.reload()
+        page.get_by_role('button', name='Communication Studio').click()
+        expect(page.get_by_role('listitem').filter(has_text='Self-introduction')).to_be_visible()
         page.get_by_role('button', name='Communication Studio').click()
         page.get_by_role('button', name='Analytics Tutor').click()
         expect(page.get_by_role('heading', name='Analytics Tutor')).to_be_visible()
@@ -143,8 +148,39 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         expect(degraded.get_by_role('heading', name='Workspace Initialization Error')).to_be_visible()
         degraded.get_by_role('button', name='Keyboard Skills Lab').click()
         expect(degraded.get_by_text('Type the sample exactly', exact=False)).to_be_visible()
+        pyodide_assets = os.environ.get('PYODIDE_ASSET_DIR')
+        if pyodide_assets:
+            notebook = browser.new_page()
+            requests = []
+            notebook.on('request', lambda request: requests.append(request.url))
+            def serve_pyodide(route):
+                file = Path(pyodide_assets) / route.request.url.rsplit('/', 1)[-1]
+                if file.is_file():
+                    route.fulfill(path=file, headers={'Access-Control-Allow-Origin': '*'})
+                else:
+                    route.abort()
+            notebook.route('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/*', serve_pyodide)
+            notebook.goto('http://localhost:4317')
+            notebook.get_by_role('button', name='Python Studio', exact=True).click()
+            requests.clear()
+            notebook.get_by_role('button', name='Boot Python Kernel').click()
+            expect(notebook.get_by_role('button', name='Kernel Ready')).to_be_visible(timeout=30000)
+            assert not [url for url in requests if '?limit=2000' in url or url.endswith('.whl')]
+            cell = notebook.locator('textarea').nth(1)
+            cell.fill("print(6 * 7)")
+            notebook.get_by_role('button', name='Run', exact=True).first.click()
+            expect(notebook.get_by_text('42', exact=True)).to_be_visible(timeout=15000)
+            assert not [url for url in requests if '?limit=2000' in url or url.endswith('.whl')]
+            cell.fill("import csv\nwith open('/workspace/retail_sales.csv') as file:\n    print('Retail rows:', len(list(csv.DictReader(file))))")
+            notebook.get_by_role('button', name='Run', exact=True).first.click()
+            expect(notebook.get_by_text('Retail rows:', exact=False)).to_be_visible(timeout=15000)
+            assert len([url for url in requests if '?limit=2000' in url]) == 1
+            notebook.get_by_role('button', name='Run', exact=True).first.click()
+            expect(notebook.get_by_role('button', name='Kernel Ready')).to_be_visible(timeout=15000)
+            assert len([url for url in requests if '?limit=2000' in url]) == 1
+            print('PASS: real Pyodide browser execution, on-demand CSV and reuse', flush=True)
         assert not errors, errors
-        print('PASS: production boot, Chromium desktop and mobile, typing metrics and persistence, keyboard chord and simulation, speaking timer and text rubric, Gemini SDK unavailable fallback, SQL grouping and grading, an Excel formula, synthetic data download and import, career tracker and keyword review, practice during a bootstrap failure, and SQLite backup restoration', flush=True)
+        print('PASS: production boot, Chromium desktop and mobile, typing metrics and persistence, keyboard chord and simulation, speaking timer, history and text rubric, Gemini SDK unavailable fallback, SQL grouping and grading, an Excel formula, synthetic data download and import, career tracker and keyword review, practice during a bootstrap failure, and SQLite backup restoration', flush=True)
     finally:
         server.terminate()
         server.wait(timeout=10)

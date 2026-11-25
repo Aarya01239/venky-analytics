@@ -39,11 +39,13 @@ NODE_ENV=production npm start
 
 ## Practice studios
 
-Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech.
+Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech. **Save and end session** keeps the elapsed time and scenario in this browser.
 
 Open **Analytics Tutor** for curated guidance or select **Gemini** to send the active workspace context to the configured API. Gemini API quotas and billing are separate from consumer Gemini subscriptions. Leave the key unset to run without provider access.
 
 Open **Career Prep** to track job applications on this browser and compare exact phrases across a posting and your resume.
+
+In **Python Studio**, use `/workspace/<table>.csv` in a cell to fetch that dataset on demand. Select a dataset and click **Mount active CSV** for paths built dynamically in Python. Scientific packages load when a cell needs them.
 
 Open **File Manager → Generate a synthetic dataset** to create practice JSON locally. Upload the file in File Manager to use it in the analytics modules.
 
