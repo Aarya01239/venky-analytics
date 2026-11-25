@@ -14,3 +14,8 @@ The documentation currently lists one 0.5 GB volume and $1 of monthly resource u
 - [Volumes](https://docs.railway.com/volumes/reference)
 - [Health checks](https://docs.railway.com/deployments/healthchecks)
 - [Dockerfile builds](https://docs.railway.com/builds/dockerfiles)
+
+
+## Optional Gemini Free Tier
+
+Create a key in [Google AI Studio](https://aistudio.google.com/api-keys) for a project labeled **Free tier** with billing disabled. In Railway service Variables, add a single variable named `GEMINI_API_KEY` and paste the key directly into its value. Apply the staged change to restart the service. The tutor uses the `gemini-3.1-flash-lite` text model. It never switches models when the quota runs out. Curated practice remains available. Google may use Free Tier prompts and responses to improve its products, so send sample or synthetic data only. See [Google's Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).

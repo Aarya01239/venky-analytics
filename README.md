@@ -8,7 +8,7 @@ A laptop-first, full-stack personal analytics workstation for learning, practici
 - **Backend**: Express + TypeScript (`server.ts`) running on Port 3000 with:
   - **Persistent SQLite Engine (`sql.js`)**: Automatically saved to `data/venky_os.sqlite` on disk. Stores all workspace metadata (`_vos_*` tables) AND real queryable relational datasets.
   - **Unified Dataset Registry**: Any CSV, XLSX, XLS, or JSON uploaded once in File Manager—or cleaned in Data Cleaning Lab—is indexed into SQLite and immediately reusable across SQL Studio, Excel Studio, Python Studio (`/workspace/<table>.csv`), Statistics Lab, Power BI Workspace, Visualization Studio, and Reporting Studio.
-  - **Server-Side Gemini AI Proxy (`/api/ai/assist`)**: Uses `@google/genai` (`gemini-4-hydrogen`) exclusively on the backend. Never exposes `GEMINI_API_KEY` to client code. Supports 5 modes (`Analyst`, `Learn`, `Practice`, `Interview`, `Report`) and `English`, `Telugu (తెలుగు)`, or `Bilingual` responses.
+  - **Server-Side Gemini AI Proxy (`/api/ai/assist`)**: Uses `@google/genai` (`gemini-3.1-flash-lite`) exclusively on the backend. Never exposes `GEMINI_API_KEY` to client code. Supports 5 modes (`Analyst`, `Learn`, `Practice`, `Interview`, `Report`) and `English`, `Telugu (తెలుగు)`, or `Bilingual` responses.
 
 ## Security & Engine Transparency
 
