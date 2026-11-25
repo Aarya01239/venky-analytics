@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { TimedTypingTest } from './TimedTypingTest';
+import { insertedRange } from './typingInput';
 
 const drills = [
   'asdf jkl; asdf jkl;',
@@ -52,7 +54,7 @@ const shortcuts = [
 ];
 const button = 'px-3 py-2 rounded border border-slate-400 hover:bg-blue-600 hover:text-white';
 export function SkillsPracticeModule() {
-  const [mode,setMode]=useState<'typing'|'shortcuts'>('typing');
+  const [mode,setMode]=useState<'typing'|'shortcuts'|'timed'>('typing');
   const [index,setIndex]=useState(0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [keyHistory, setKeyHistory] = useState(() => readCounts(keyHistoryStorage, key => /^[ -~]$/.test(key)));
@@ -122,15 +124,8 @@ export function SkillsPracticeModule() {
   function updateTyping(value: string) {
     const now = Date.now();
     const began = start || now;
-    let firstChange = 0;
-    while (firstChange < input.length && input[firstChange] === value[firstChange]) firstChange++;
-    let oldEnd = input.length;
-    let newEnd = value.length;
-    while (oldEnd > firstChange && newEnd > firstChange && input[oldEnd - 1] === value[newEnd - 1]) {
-      oldEnd--;
-      newEnd--;
-    }
-    const typed = value.slice(firstChange, newEnd);
+    const { start: firstChange, end } = insertedRange(input, value);
+    const typed = value.slice(firstChange, end);
     let errors = 0;
     for (let offset = 0; offset < typed.length; offset++) {
       const expected = target[firstChange + offset];
@@ -169,8 +164,8 @@ export function SkillsPracticeModule() {
 
   return <section className="p-6 space-y-5 max-w-4xl mx-auto">
     <h1 className="text-2xl font-bold">Keyboard Skills Lab</h1>
-    <div className="flex gap-2"><button className={button} onClick={()=>{setMode('typing');reset(0)}}>Typing Studio</button><button className={button} onClick={()=>{setMode('shortcuts');reset(0)}}>Shortcut Trainer</button></div>
-    {mode==='typing'?<>
+    <div className="flex flex-wrap gap-2"><button className={button} onClick={()=>{setMode('typing');reset(0)}}>Typing Studio</button><button className={button} onClick={() => { setMode('timed'); reset(0); }}>Timed Test</button><button className={button} onClick={()=>{setMode('shortcuts');reset(0)}}>Shortcut Trainer</button></div>
+    {mode === 'timed' ? <TimedTypingTest /> : mode==='typing'?<>
       <p>{focusKey === null ? 'Type the sample exactly. Practice English, SQL, Python and Excel.' : `Focused drill for ${keyLabel(focusKey)}. Type the sample exactly.`}</p>
       <div className="font-mono text-xl whitespace-pre-wrap break-all p-4 border rounded">{[...target].map((c,i)=><span key={i} className={i>=input.length?'opacity-60':input[i]===c?'text-green-500':'text-red-500 underline'}>{c}</span>)}</div>
       <textarea ref={area} aria-label="Typing exercise" className="w-full border rounded p-3 bg-transparent font-mono" value={input} disabled={done} onPaste={e => e.preventDefault()} onDrop={e => e.preventDefault()} autoComplete="off" autoCorrect="off" spellCheck={false} onChange={e => updateTyping(e.target.value)}/>

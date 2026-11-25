@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## Timed typing follow-up
+
+- Keyboard Skills Lab offers 30- and 60-second timed typing tests. The score uses correct characters at timeout for WPM and counts corrected mistakes in accuracy. The twelve most recent timed results are saved in this browser, separately from regular typing records.
+- The Chromium smoke suite uses a controlled clock to verify timeout, an edited mistake, scoring, result persistence after reload, a 60-second selection, and cancellation with no saved result.
+
 ## Keyboard practice follow-up
 
 - Typing Studio tracks attempts and mistakes against expected keys when a drill is completed. It shows up to eight keys ranked by missed share and offers a focused drill for each. Focused drills update key practice history while regular exercises retain their separate WPM record.
@@ -45,7 +50,7 @@ The available Sites runtime accepts static output or a Worker fetch handler. The
 
 1. Verify Gemini with a user-managed key and exercise the real microphone and Telugu voice on Chrome desktop and Android. Keep the curated approach available without a key.
 2. Verify Pandas and Matplotlib downloads, plots and notebook exports over a live network. Validate additional Excel formulas and workbook persistence.
-3. Extend keyboard practice with time trials, goals and progress charts. Expand the learning, interview, analytics and project modules using the acceptance checklist.
+3. Extend keyboard practice with daily goals, progress charts and additional passages. Expand the learning, interview, analytics and project modules using the acceptance checklist.
 4. Add private hosting, access controls, rate limits, and a restore rehearsal. Verify deployment before releasing a URL.
 
 
