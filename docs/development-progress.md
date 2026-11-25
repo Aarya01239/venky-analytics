@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Keyboard practice follow-up
+
+- Typing Studio tracks attempts and mistakes against expected keys when a drill is completed. It shows up to eight keys ranked by missed share and offers a focused drill for each. Focused drills update key practice history while regular exercises retain their separate WPM record.
+- Shortcut Trainer saves per-shortcut results in the current browser and can reopen the tested shortcut with the lowest accuracy. Both direct key capture and reserved-key simulation contribute to that history.
+- Chromium smoke checks cover corrected typing mistakes, focused drill completion, unchanged regular WPM history, shortcut practice selection, and both histories after reload. TypeScript and production builds passed.
+
 ## Second development pass
 
 - Python Studio starts with the Pyodide core. The worker loads Python packages required by the current cell. Saved cells using `pd`, `np` and `plt` aliases still receive the matching imports on demand.
@@ -39,7 +45,7 @@ The available Sites runtime accepts static output or a Worker fetch handler. The
 
 1. Verify Gemini with a user-managed key and exercise the real microphone and Telugu voice on Chrome desktop and Android. Keep the curated approach available without a key.
 2. Verify Pandas and Matplotlib downloads, plots and notebook exports over a live network. Validate additional Excel formulas and workbook persistence.
-3. Add adaptive keyboard drills and durable practice histories, then extend the existing learning, interview, analytics and project modules using the acceptance checklist.
+3. Extend keyboard practice with time trials, goals and progress charts. Expand the learning, interview, analytics and project modules using the acceptance checklist.
 4. Add private hosting, access controls, rate limits, and a restore rehearsal. Verify deployment before releasing a URL.
 
 

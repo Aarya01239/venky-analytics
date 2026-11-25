@@ -39,7 +39,7 @@ NODE_ENV=production npm start
 
 ## Practice studios
 
-Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech. **Save and end session** keeps the elapsed time and scenario in this browser.
+Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. **Keys to practice** opens a focused typing drill for mistakes from completed exercises. **Review lowest-accuracy shortcut** uses this browser’s saved shortcut attempts. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech. **Save and end session** keeps the elapsed time and scenario in this browser.
 
 Open **Analytics Tutor** for curated guidance or select **Gemini** to send the active workspace context to the configured API. Gemini API quotas and billing are separate from consumer Gemini subscriptions. Leave the key unset to run without provider access.
 

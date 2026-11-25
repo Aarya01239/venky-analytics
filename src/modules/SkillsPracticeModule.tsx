@@ -10,6 +10,31 @@ const drills = [
   '=SUMIFS(C2:C100,A2:A100,"North")',
   'The monthly revenue increased by 12 percent.',
 ];
+type KeyCount = { attempts: number; mistakes: number };
+type KeyHistory = Record<string, KeyCount>;
+const keyHistoryStorage = 'vos.typing.keys.v1';
+const shortcutHistoryStorage = 'vos.shortcuts.history.v1';
+
+function readCounts(storageKey: string, acceptKey: (key: string) => boolean): KeyHistory {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
+    if (!saved || typeof saved !== 'object') return {};
+    return Object.fromEntries(Object.entries(saved).filter(([key, count]) =>
+      acceptKey(key) && count && Number.isSafeInteger(count.attempts) &&
+      Number.isSafeInteger(count.mistakes) && count.attempts > 0 &&
+      count.mistakes >= 0 && count.mistakes <= count.attempts));
+  } catch { return {}; }
+}
+
+function keyLabel(key: string) {
+  return key === ' ' ? 'Space' : key;
+}
+
+function focusedDrill(key: string) {
+  const neighbors = key === ' ' ? ['as', 'df', 'jk', 'l;'] : ['a', 's', 'j', 'l'];
+  return neighbors.map(neighbor => neighbor + key + neighbor).join(' ');
+}
+
 const shortcuts = [
   {app:'Excel', task:'Toggle filters', key:'l', ctrl:true, shift:true},
   {app:'Excel', task:'Format cells', key:'1', ctrl:true, shift:false},
@@ -29,6 +54,13 @@ const button = 'px-3 py-2 rounded border border-slate-400 hover:bg-blue-600 hove
 export function SkillsPracticeModule() {
   const [mode,setMode]=useState<'typing'|'shortcuts'>('typing');
   const [index,setIndex]=useState(0);
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [keyHistory, setKeyHistory] = useState(() => readCounts(keyHistoryStorage, key => /^[ -~]$/.test(key)));
+  const [shortcutHistory, setShortcutHistory] = useState(() => readCounts(
+    shortcutHistoryStorage,
+    key => shortcuts.some(shortcut => shortcut.app + ' · ' + shortcut.task === key),
+  ));
+  const drillKeys = useRef<KeyHistory>({});
   const [input,setInput]=useState('');
   const [start,setStart]=useState(0);
   const [elapsed,setElapsed]=useState(0);
@@ -41,13 +73,32 @@ export function SkillsPracticeModule() {
     return Array.isArray(saved) ? saved.filter((score): score is number => typeof score === 'number' && Number.isFinite(score) && score >= 0).slice(0, 30) : [];
   } catch { return []; }});
   const area=useRef<HTMLTextAreaElement>(null);
-  const target=drills[index%drills.length];
+  const target = focusKey === null ? drills[index % drills.length] : focusedDrill(focusKey);
+  const weakKeys = Object.entries(keyHistory)
+    .filter(([, counts]) => counts.mistakes > 0)
+    .sort(([, a], [, b]) => b.mistakes / b.attempts - a.mistakes / a.attempts || b.mistakes - a.mistakes)
+    .slice(0, 8);
   const done=input===target;
   const matches=[...input].filter((c,i)=>c===target[i]).length;
   const wpm=elapsed>0?Math.round(matches/5*60/elapsed):0;
   useEffect(()=>{if(!start||done||mode!=='typing')return;const id=window.setInterval(()=>setElapsed((Date.now()-start)/1000),200);return()=>clearInterval(id)},[start,done,mode]);
-  function reset(next:number){setIndex(next);setInput('');setStart(0);setElapsed(0);setFeedback('');setKeystrokes({total:0,errors:0})}
-  const shortcut=shortcuts[index%shortcuts.length];
+  function reset(next: number, nextFocus: string | null = null) {
+    setIndex(next);
+    setFocusKey(nextFocus);
+    setInput('');
+    setStart(0);
+    setElapsed(0);
+    setFeedback('');
+    setKeystrokes({ total: 0, errors: 0 });
+    drillKeys.current = {};
+  }
+  const shortcut = shortcuts[index % shortcuts.length];
+  const shortcutId = shortcut.app + ' · ' + shortcut.task;
+  const shortcutStats = shortcutHistory[shortcutId];
+  const weakShortcut = shortcuts
+    .map((item, position) => ({ position, stats: shortcutHistory[item.app + ' · ' + item.task] }))
+    .filter(({ stats }) => stats?.mistakes)
+    .sort((a, b) => b.stats.mistakes / b.stats.attempts - a.stats.mistakes / a.stats.attempts)[0];
   const accuracy = keystrokes.total ? Math.round(100 * (keystrokes.total - keystrokes.errors) / keystrokes.total) : 100;
   const chord = [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
   const [simulation, setSimulation] = useState<string[]>([]);
@@ -57,6 +108,15 @@ export function SkillsPracticeModule() {
     setAttempts(value => value + 1);
     if (ok) setCorrect(value => value + 1);
     setFeedback(ok ? 'Correct!' : 'Try again.');
+    const next = {
+      ...shortcutHistory,
+      [shortcutId]: {
+        attempts: (shortcutStats?.attempts ?? 0) + 1,
+        mistakes: (shortcutStats?.mistakes ?? 0) + Number(!ok),
+      },
+    };
+    setShortcutHistory(next);
+    try { localStorage.setItem(shortcutHistoryStorage, JSON.stringify(next)); } catch { /* Storage is optional. */ }
   }
 
   function updateTyping(value: string) {
@@ -71,17 +131,39 @@ export function SkillsPracticeModule() {
       newEnd--;
     }
     const typed = value.slice(firstChange, newEnd);
-    const errors = [...typed].filter((character, offset) => character !== target[firstChange + offset]).length;
+    let errors = 0;
+    for (let offset = 0; offset < typed.length; offset++) {
+      const expected = target[firstChange + offset];
+      const missed = typed[offset] !== expected;
+      if (missed) errors++;
+      if (expected === undefined) continue;
+      const count = drillKeys.current[expected] ?? { attempts: 0, mistakes: 0 };
+      drillKeys.current[expected] = {
+        attempts: count.attempts + 1,
+        mistakes: count.mistakes + Number(missed),
+      };
+    }
     setKeystrokes(previous => ({ total: previous.total + typed.length, errors: previous.errors + errors }));
     setStart(began);
     setInput(value);
     const seconds = Math.max((now - began) / 1000, 1);
     setElapsed(seconds);
     if (value === target) {
-      const score = Math.round(target.length * 12 / seconds);
-      const next = [score, ...history].slice(0, 30);
-      setHistory(next);
-      try { localStorage.setItem('vos.typing.history', JSON.stringify(next)); } catch { /* Storage is optional. */ }
+      const updatedKeys = { ...keyHistory };
+      for (const [key, count] of Object.entries(drillKeys.current)) {
+        const prior = updatedKeys[key] ?? { attempts: 0, mistakes: 0 };
+        updatedKeys[key] = {
+          attempts: prior.attempts + count.attempts,
+          mistakes: prior.mistakes + count.mistakes,
+        };
+      }
+      setKeyHistory(updatedKeys);
+      try { localStorage.setItem(keyHistoryStorage, JSON.stringify(updatedKeys)); } catch { /* Storage is optional. */ }
+      if (focusKey === null) {
+        const next = [Math.round(target.length * 12 / seconds), ...history].slice(0, 30);
+        setHistory(next);
+        try { localStorage.setItem('vos.typing.history', JSON.stringify(next)); } catch { /* Storage is optional. */ }
+      }
     }
   }
 
@@ -89,13 +171,29 @@ export function SkillsPracticeModule() {
     <h1 className="text-2xl font-bold">Keyboard Skills Lab</h1>
     <div className="flex gap-2"><button className={button} onClick={()=>{setMode('typing');reset(0)}}>Typing Studio</button><button className={button} onClick={()=>{setMode('shortcuts');reset(0)}}>Shortcut Trainer</button></div>
     {mode==='typing'?<>
-      <p>Type the sample exactly. Practice English, SQL, Python and Excel.</p>
+      <p>{focusKey === null ? 'Type the sample exactly. Practice English, SQL, Python and Excel.' : `Focused drill for ${keyLabel(focusKey)}. Type the sample exactly.`}</p>
       <div className="font-mono text-xl whitespace-pre-wrap break-all p-4 border rounded">{[...target].map((c,i)=><span key={i} className={i>=input.length?'opacity-60':input[i]===c?'text-green-500':'text-red-500 underline'}>{c}</span>)}</div>
       <textarea ref={area} aria-label="Typing exercise" className="w-full border rounded p-3 bg-transparent font-mono" value={input} disabled={done} onPaste={e => e.preventDefault()} onDrop={e => e.preventDefault()} autoComplete="off" autoCorrect="off" spellCheck={false} onChange={e => updateTyping(e.target.value)}/>
       <div className="flex flex-wrap gap-5"><span>WPM: {wpm}</span><span>Accuracy: {accuracy}%</span><span>Raw WPM: {elapsed ? Math.round(keystrokes.total * 12 / elapsed) : 0}</span><span>Time: {elapsed.toFixed(1)}s</span><span>Best completed WPM: {Math.max(0,...history)}</span></div>
       {done&&<p role="status">Exercise complete!</p>}
       <button className={button} onClick={()=>{reset(index+1);window.setTimeout(()=>area.current?.focus(),0)}}>Next exercise</button>
-      <button className={button} onClick={()=>reset(index)}>Retry</button>
+      <button className={button} onClick={() => reset(index, focusKey)}>Retry</button>
+      <section className="space-y-2">
+        <h2 className="font-semibold">Keys to practice</h2>
+        {weakKeys.length ? <>
+          <p className="text-sm">Mistakes are counted against the expected key in completed drills. Select a key to practice it.</p>
+          <ul className="flex flex-wrap gap-2">
+            {weakKeys.map(([key, count]) => <li key={key}>
+              <button className={button} onClick={() => {
+                reset(index, key);
+                window.setTimeout(() => area.current?.focus(), 0);
+              }} aria-pressed={focusKey === key}>
+                <span className="font-mono">{keyLabel(key)}</span> · {count.mistakes}/{count.attempts} missed
+              </button>
+            </li>)}
+          </ul>
+        </> : <p className="text-sm">Keys with mistakes will appear here after you finish a drill.</p>}
+      </section>
     </>:<>
       <p>{shortcut.app}: {shortcut.task}</p>
       {shortcut.reserved ? <>
@@ -128,7 +226,12 @@ export function SkillsPracticeModule() {
         }}>Focus here to capture keys</div>
       </>}
       <p role="status">{feedback}</p>
-      <p>Correct attempts: {correct}/{attempts}</p>
+      <p>Correct attempts this visit: {correct}/{attempts}</p>
+      {shortcutStats && <p>Saved attempts for this shortcut: {shortcutStats.attempts - shortcutStats.mistakes}/{shortcutStats.attempts} correct</p>}
+      {weakShortcut && <button className={button} onClick={() => {
+        reset(weakShortcut.position);
+        setSimulation([]);
+      }}>Review lowest-accuracy shortcut</button>}
       <button className={button} onClick={()=>setFeedback(chord.join(' + '))}>Reveal</button>
       <button className={button} onClick={()=>reset(index+1)}>Next shortcut</button>
     </>}
