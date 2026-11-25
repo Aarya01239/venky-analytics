@@ -17,7 +17,7 @@ import {
   withReadOnlySnapshot,
 } from './server/db.ts';
 import { runGeminiAssistant } from './server/gemini.ts';
-import { SQL_CHALLENGES } from './src/data/curriculum.ts';
+import { SQL_CHALLENGES, sqlChallengeTopicId } from './src/data/curriculum.ts';
 import type { Database } from 'sql.js';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -531,8 +531,23 @@ app.post('/api/sql/evaluate', async (req, res) => {
     const sameColCount = u.columns.length === s.columns.length;
     const exactMatch = sameRowCount && sameColCount && JSON.stringify(uNorm) === JSON.stringify(sNorm);
 
+    let progress;
+    if (exactMatch) {
+      const db = await getDb();
+      const topicId = sqlChallengeTopicId(challenge.id);
+      db.run(
+        `INSERT OR IGNORE INTO _vos_learning_progress
+          (topic_id, level, status, score, time_spent_min, last_accessed)
+        VALUES (?, ?, 'completed', 100, 0, ?)`,
+        [topicId, challenge.level, new Date().toISOString()],
+      );
+      if (db.getRowsModified() > 0) persistDb(db);
+      progress = queryAll(db, 'SELECT * FROM _vos_learning_progress WHERE topic_id = ?', [topicId])[0];
+    }
+
     res.json({
       passed: exactMatch,
+      progress,
       userRowCount: u.values.length,
       expectedRowCount: s.values.length,
       expectedColumns: s.columns,

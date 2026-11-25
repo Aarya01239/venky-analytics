@@ -11,6 +11,8 @@ export interface SqlChallenge {
   solutionSql: string;
 }
 
+export const sqlChallengeTopicId = (id: string) => 'sql-challenge:' + id;
+
 export const SQL_CHALLENGES: SqlChallenge[] = [
   {
     id: 'retail-revenue-by-region',

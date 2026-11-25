@@ -45,7 +45,7 @@ Open **Analytics Tutor** for curated guidance or select **Gemini** to send the a
 
 Open **Career Prep** to track job applications on this browser and compare exact phrases across a posting and your resume.
 
-Open **SQL Studio → Challenges** for SQLite exercises on the sample data. Use **Show hint** when available, then **Verify Solution** to check your query output.
+Open **SQL Studio → Challenges** for SQLite exercises on the sample data. Use **Show hint** when available, then **Verify Solution** to check your query output. Verified challenges appear in your saved SQL progress.
 
 In **Python Studio**, use `/workspace/<table>.csv` in a cell to fetch that dataset on demand. Select a dataset and click **Mount active CSV** for paths built dynamically in Python. Scientific packages load when a cell needs them.
 

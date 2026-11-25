@@ -40,7 +40,7 @@ export const LearningModule: React.FC = () => {
     await saveProgress(activeLesson, isCorrect ? 'completed' : 'in_progress', isCorrect ? 100 : 50);
   };
 
-  const completedCount = learningProgress.filter((l) => l.status === 'completed').length;
+  const completedCount = LEARNING_CURRICULUM.filter(lesson => learningProgress.some(record => record.topic_id === lesson.id && record.status === 'completed')).length;
 
   return (
     <div className="p-6 max-w-[1440px] mx-auto space-y-5">

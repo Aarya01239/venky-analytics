@@ -18,7 +18,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { SQL_CHALLENGES, SqlChallenge } from '../data/curriculum';
+import { SQL_CHALLENGES, SqlChallenge, sqlChallengeTopicId } from '../data/curriculum';
 import { exportRowsToCsv, exportRowsToXlsx } from '../utils/exporters';
 
 interface SchemaTable {
@@ -52,6 +52,8 @@ export const SqlStudioModule: React.FC = () => {
     askGeminiWithPrompt,
     datasets,
     activeDatasetId,
+    learningProgress,
+    recordLearningProgress,
   } = useWorkspace();
 
   const [schema, setSchema] = useState<SchemaTable[]>([]);
@@ -77,6 +79,8 @@ export const SqlStudioModule: React.FC = () => {
 
   const [activeChallenge, setActiveChallenge] = useState<SqlChallenge | null>(null);
   const [evalResult, setEvalResult] = useState<{ passed: boolean; feedback: string } | null>(null);
+  const verifiedTopics = new Set(learningProgress.filter(record => record.status === 'completed').map(record => record.topic_id));
+  const verifiedCount = SQL_CHALLENGES.filter(challenge => verifiedTopics.has(sqlChallengeTopicId(challenge.id))).length;
   const [showOracleNote, setShowOracleNote] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -160,7 +164,7 @@ export const SqlStudioModule: React.FC = () => {
   };
 
   const evaluateChallenge = async () => {
-    if (!activeChallenge) return;
+    if (!activeChallenge || running) return;
     setRunning(true);
     try {
       const res = await fetch('/api/sql/evaluate', {
@@ -175,8 +179,11 @@ export const SqlStudioModule: React.FC = () => {
       const data = await res.json();
       setEvalResult({ passed: Boolean(data.passed), feedback: data.feedback });
       if (data.passed) {
+        if (data.progress) recordLearningProgress(data.progress);
         pushNotification('Challenge Passed', `Verified solution for "${activeChallenge.title}"`, 'success');
       }
+    } catch {
+      setEvalResult({ passed: false, feedback: 'Could not reach the SQL grader. Try again.' });
     } finally {
       setRunning(false);
     }
@@ -346,7 +353,7 @@ export const SqlStudioModule: React.FC = () => {
           {leftTab === 'challenges' && (
             <div className="space-y-2.5">
               <div className="text-[11px] text-slate-500">
-                Real automatic evaluation compares your SQL output directly against verified database results.
+                {verifiedCount} of {SQL_CHALLENGES.length} SQL challenges verified
               </div>
               {SQL_CHALLENGES.map((ch) => (
                 <button
@@ -367,7 +374,7 @@ export const SqlStudioModule: React.FC = () => {
                     <span className="truncate">{ch.title}</span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    {ch.level} · {ch.topic}
+                    {ch.level} · {ch.topic}{verifiedTopics.has(sqlChallengeTopicId(ch.id)) ? ' · Verified' : ''}
                   </div>
                 </button>
               ))}

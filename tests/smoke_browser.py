@@ -221,6 +221,7 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         page.get_by_role('button', name='Excel Studio', exact=True).click()
         page.get_by_placeholder('Enter Excel formula', exact=False).fill('=SUM(2,3)')
         expect(page.get_by_text('Result:', exact=False).filter(has=page.get_by_text('5', exact=True))).to_be_visible()
+        page.reload()
         page.get_by_role('button', name='SQL Studio', exact=True).click()
         page.get_by_role('button', name='Challenges', exact=True).click()
         page.get_by_role('button', name='Keep customers with no returns', exact=False).click()
@@ -238,6 +239,11 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
             'userSql': 'SELECT customer_id, COUNT(*) AS orders, SUM(returned) AS returns FROM ecommerce_orders GROUP BY customer_id ORDER BY customer_id;'
         })
         assert alternative.ok and alternative.json()['passed'], alternative.text()
+        expect(page.get_by_text('5 of 6 SQL challenges verified', exact=True)).to_be_visible()
+        page.reload()
+        page.get_by_role('button', name='SQL Studio', exact=True).click()
+        page.get_by_role('button', name='Challenges', exact=True).click()
+        expect(page.get_by_text('5 of 6 SQL challenges verified', exact=True)).to_be_visible()
         page.get_by_role('button', name='File Manager', exact=False).click()
         page.get_by_text('Generate a synthetic dataset').click()
         page.get_by_label('Scenario').select_option('payments')
@@ -293,6 +299,8 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
             raise AssertionError('server failed to restart')
         assert any(entry['topic_id'] == 'smoke-test-lesson' and entry['score'] == 100 for entry in workspace['learning'])
         assert any('synthetic_payments' in entry['name'] for entry in workspace['datasets'])
+        verified = [entry for entry in workspace['learning'] if entry['topic_id'].startswith('sql-challenge:')]
+        assert len(verified) == 5 and all(entry['status'] == 'completed' for entry in verified)
         degraded = browser.new_page()
         degraded.route('**/api/bootstrap', lambda route: route.fulfill(status=503, json={'error': 'Test backend outage'}))
         degraded.goto('http://localhost:4317')

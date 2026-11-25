@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## Verified SQL progress
+
+- SQL Studio records a challenge once when the server verifies a matching query result. It shows the total verified and individual badges. Failed attempts do not add progress, and repeating an already verified answer does not change the count.
+- SQL verification uses its own topic prefix in the existing SQLite progress table. Dashboard and My Learning count curriculum lessons separately. Chromium covers the count, reload, and restoration from the SQLite backup.
+
 ## E-commerce SQL challenges
 
 - SQL Studio includes four new SQLite exercises using the existing sample e-commerce orders. They cover date filtering, conditional return rates, retaining customers with no returns, and cumulative monthly sales.

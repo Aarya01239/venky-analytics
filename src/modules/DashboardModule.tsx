@@ -37,7 +37,7 @@ export const DashboardModule: React.FC = () => {
   const [savingTask, setSavingTask] = useState(false);
 
   const track = CAREER_TRACKS.find((c) => c.id === activeCareerTrack) || CAREER_TRACKS[0];
-  const completedLessons = learningProgress.filter((l) => l.status === 'completed').length;
+  const completedLessons = LEARNING_CURRICULUM.filter(lesson => learningProgress.some(record => record.topic_id === lesson.id && record.status === 'completed')).length;
   const totalLessons = LEARNING_CURRICULUM.length;
   const learningPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
