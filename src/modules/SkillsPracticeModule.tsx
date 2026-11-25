@@ -52,6 +52,14 @@ const shortcuts = [
   {app:'Google Docs', task:'Italicize selection', key:'i', ctrl:true, shift:false},
   {app:'Word', task:'Bold selected text', key:'b', ctrl:true, shift:false},
 ];
+function shortcutChord(shortcut: typeof shortcuts[number]) {
+  return [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
+}
+
+function searchWords(value: string) {
+  return value.toLowerCase().replace(/[+\s]+/g, ' ').trim();
+}
+
 const button = 'px-3 py-2 rounded border border-slate-400 hover:bg-blue-600 hover:text-white';
 export function SkillsPracticeModule() {
   const [mode,setMode]=useState<'typing'|'shortcuts'|'timed'>('typing');
@@ -68,9 +76,11 @@ export function SkillsPracticeModule() {
   const [elapsed,setElapsed]=useState(0);
   const [keystrokes, setKeystrokes] = useState({ total: 0, errors: 0 });
   const [shortcutApp, setShortcutApp] = useState('All apps');
+  const [shortcutSearch, setShortcutSearch] = useState('');
   const [timedStart, setTimedStart] = useState(0);
   const [shortcutSeconds, setShortcutSeconds] = useState(10);
   const shortcutArea = useRef<HTMLDivElement>(null);
+  const shortcutTask = useRef<HTMLParagraphElement>(null);
   const [attempts,setAttempts]=useState(0);
   const [correct,setCorrect]=useState(0);
   const [feedback,setFeedback]=useState('');
@@ -110,7 +120,14 @@ export function SkillsPracticeModule() {
     .filter(({ stats }) => stats?.mistakes)
     .sort((a, b) => b.stats.mistakes / b.stats.attempts - a.stats.mistakes / a.stats.attempts)[0];
   const accuracy = keystrokes.total ? Math.round(100 * (keystrokes.total - keystrokes.errors) / keystrokes.total) : 100;
-  const chord = [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
+  const chord = shortcutChord(shortcut);
+  const terms = searchWords(shortcutSearch).split(' ').filter(Boolean);
+  const combination = shortcutSearch.includes('+') ? [...terms].sort().join(' ') : '';
+  const matchingShortcuts = filteredShortcuts.filter(item => {
+    if (combination) return shortcutChord(item).map(key => key.toLowerCase()).sort().join(' ') === combination;
+    const text = searchWords([item.app, item.task, ...shortcutChord(item)].join(' '));
+    return terms.every(term => text.includes(term));
+  });
   const [simulation, setSimulation] = useState<string[]>([]);
   useEffect(() => setSimulation([]), [index, mode]);
 
@@ -246,7 +263,7 @@ export function SkillsPracticeModule() {
         }}>{timedStart ? 'Cancel timed attempt' : 'Start 10-second attempt'}</button>
         {timedStart > 0 && <span aria-label="Shortcut time remaining">{shortcutSeconds}s</span>}
       </div>
-      <p>{shortcut.app}: {shortcut.task}</p>
+      <p ref={shortcutTask} tabIndex={-1}>{shortcut.app}: {shortcut.task}</p>
       {shortcut.reserved ? <>
         <p className="text-sm">Your browser or operating system may handle this shortcut. Select the keys in order to simulate it.</p>
         <div className="flex flex-wrap gap-2">
@@ -288,6 +305,27 @@ export function SkillsPracticeModule() {
       }}>Review lowest-accuracy shortcut</button>}
       <button className={button} disabled={timedStart > 0} onClick={()=>setFeedback(chord.join(' + '))}>Reveal</button>
       <button className={button} onClick={()=>reset(index+1)}>Next shortcut</button>
+      <details className="space-y-3 rounded border p-4">
+        <summary className="cursor-pointer font-semibold">Shortcut reference</summary>
+        <label className="block text-sm">Search shortcuts
+          <input className="mt-1 block w-full rounded border bg-transparent p-2" type="search" value={shortcutSearch}
+            onChange={event => setShortcutSearch(event.target.value)} placeholder="App, action or key combination" />
+        </label>
+        {matchingShortcuts.length ? <ul className="divide-y" aria-label="Matching shortcuts">
+          {matchingShortcuts.map(item => (
+            <li key={item.app + item.task} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <div>
+                <p className="text-sm font-medium">{item.app} · {item.task}</p>
+                <p className="text-sm">{shortcutChord(item).join(' + ')}{item.reserved ? ' · On-screen simulation' : ''}</p>
+              </div>
+              <button className={button} aria-label={`Practice ${item.app} ${item.task}`} onClick={() => {
+                reset(filteredShortcuts.indexOf(item));
+                requestAnimationFrame(() => shortcutTask.current?.focus());
+              }}>Practice</button>
+            </li>
+          ))}
+        </ul> : <p className="text-sm">No matching shortcuts. Try another search or choose All apps.</p>}
+      </details>
     </>}
   </section>;
 }

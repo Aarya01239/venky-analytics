@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## Shortcut reference
+
+- Shortcut Trainer includes a reference searchable by app, action or a full key combination such as `Ctrl+Shift+L`. The existing app selector scopes the list. Browser- and system-reserved entries identify their on-screen simulation.
+- Selecting Practice opens the chosen shortcut and moves keyboard focus to its prompt. Chromium covers exact chord lookup, action search, capture and simulation entry points, and the empty state.
+
 ## Shortcut practice by app
 
 - Shortcut Trainer filters practice by app and supports optional ten-second attempts. Starting a timed attempt focuses the keyboard capture area for supported chords. Browser- or system-reserved chords are practiced with the on-screen simulation.
