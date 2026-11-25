@@ -6,6 +6,7 @@ export interface SqlChallenge {
   topic: string;
   level: string;
   prompt: string;
+  hint?: string;
   starterSql: string;
   solutionSql: string;
 }
@@ -28,6 +29,65 @@ export const SQL_CHALLENGES: SqlChallenge[] = [
     prompt: 'Return region, order_id and revenue_rank using DENSE_RANK by descending revenue within each region. Sort by region, rank and order_id.',
     starterSql: 'SELECT region, order_id, revenue\nFROM retail_sales;',
     solutionSql: 'SELECT region, order_id, DENSE_RANK() OVER (PARTITION BY region ORDER BY revenue DESC) AS revenue_rank FROM retail_sales ORDER BY region, revenue_rank, order_id;',
+  },
+  {
+    id: 'ecommerce-q1-returns',
+    title: 'Find returned orders in Q1',
+    topic: 'Date range and WHERE',
+    level: 'Beginner',
+    prompt: 'Return order_id, order_date, and order_value for returned e-commerce orders dated January through March 2026. Sort by date, then order ID.',
+    hint: 'Use January 1 as the inclusive start and April 1 as the exclusive end. The returned flag is 1 for a return.',
+    starterSql: 'SELECT order_id, order_date, order_value FROM ecommerce_orders;',
+    solutionSql: "SELECT order_id, order_date, order_value FROM ecommerce_orders WHERE returned = 1 AND order_date >= '2026-01-01' AND order_date < '2026-04-01' ORDER BY order_date, order_id;",
+  },
+  {
+    id: 'ecommerce-channel-return-rate',
+    title: 'Compare returns by acquisition channel',
+    topic: 'Conditional aggregation',
+    level: 'Intermediate',
+    prompt: 'Return channel, total order count, returned order count, and return percentage rounded to two decimals. Sort by return percentage descending, then channel.',
+    hint: 'Group by channel. A CASE expression can count returned orders. Use 100.0 to avoid integer division.',
+    starterSql: 'SELECT channel, returned FROM ecommerce_orders;',
+    solutionSql: `SELECT channel, COUNT(*) AS order_count,
+  SUM(CASE WHEN returned = 1 THEN 1 ELSE 0 END) AS return_count,
+  ROUND(100.0 * SUM(CASE WHEN returned = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS return_pct
+FROM ecommerce_orders GROUP BY channel ORDER BY return_pct DESC, channel;`,
+  },
+  {
+    id: 'ecommerce-customer-left-join',
+    title: 'Keep customers with no returns',
+    topic: 'CTE and LEFT JOIN',
+    level: 'Intermediate',
+    prompt: 'Return one row per customer with customer_id, total orders, and returned orders. Include customers with and without returns. Sort by customer ID.',
+    hint: 'Aggregate all orders and returned orders separately by customer. Left join the aggregates and use COALESCE for null return counts.',
+    starterSql: 'SELECT customer_id, COUNT(*) AS orders FROM ecommerce_orders GROUP BY customer_id;',
+    solutionSql: `WITH totals AS (
+  SELECT customer_id, COUNT(*) AS orders FROM ecommerce_orders GROUP BY customer_id
+), returned_orders AS (
+  SELECT customer_id, COUNT(*) AS returns FROM ecommerce_orders WHERE returned = 1 GROUP BY customer_id
+)
+SELECT totals.customer_id, orders, COALESCE(returns, 0) AS returns
+FROM totals LEFT JOIN returned_orders ON returned_orders.customer_id = totals.customer_id
+ORDER BY totals.customer_id;`,
+  },
+  {
+    id: 'ecommerce-monthly-running-value',
+    title: 'Build a running monthly sales report',
+    topic: 'CTE and window aggregation',
+    level: 'Advanced',
+    prompt: 'Return month (YYYY-MM), kept order value, and the running kept order value through that month for 2026. Exclude returned orders from amounts, keep months with only returned orders as zero, round amounts to two decimals, and sort by month.',
+    hint: 'Build one row per month with conditional aggregation. Then apply a window SUM ordered by month.',
+    starterSql: "SELECT SUBSTR(order_date, 1, 7) AS month, order_value, returned FROM ecommerce_orders;",
+    solutionSql: `WITH monthly AS (
+  SELECT SUBSTR(order_date, 1, 7) AS month,
+    SUM(CASE WHEN returned = 0 THEN order_value ELSE 0 END) AS kept_value
+  FROM ecommerce_orders
+  WHERE order_date >= '2026-01-01' AND order_date < '2027-01-01'
+  GROUP BY SUBSTR(order_date, 1, 7)
+)
+SELECT month, ROUND(kept_value, 2) AS kept_value,
+  ROUND(SUM(kept_value) OVER (ORDER BY month ROWS UNBOUNDED PRECEDING), 2) AS running_kept_value
+FROM monthly ORDER BY month;`,
   },
 ];
 

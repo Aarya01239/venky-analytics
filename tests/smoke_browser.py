@@ -221,6 +221,23 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         page.get_by_role('button', name='Excel Studio', exact=True).click()
         page.get_by_placeholder('Enter Excel formula', exact=False).fill('=SUM(2,3)')
         expect(page.get_by_text('Result:', exact=False).filter(has=page.get_by_text('5', exact=True))).to_be_visible()
+        page.get_by_role('button', name='SQL Studio', exact=True).click()
+        page.get_by_role('button', name='Challenges', exact=True).click()
+        page.get_by_role('button', name='Keep customers with no returns', exact=False).click()
+        page.get_by_text('Show hint', exact=True).click()
+        expect(page.get_by_text('Aggregate all orders and returned orders separately', exact=False)).to_be_visible()
+        page.get_by_role('button', name='Verify Solution', exact=True).click()
+        expect(page.get_by_text('Column count mismatch', exact=False)).to_be_visible()
+        for title in ('Find returned orders in Q1', 'Compare returns by acquisition channel', 'Keep customers with no returns', 'Build a running monthly sales report'):
+            page.get_by_role('button', name=title, exact=False).click()
+            page.get_by_role('button', name='Load Solution', exact=True).click()
+            page.get_by_role('button', name='Verify Solution', exact=True).click()
+            expect(page.get_by_text('Verified! Your SQL query output matches', exact=False)).to_be_visible()
+        alternative = page.request.post('http://localhost:4317/api/sql/evaluate', data={
+            'challengeId': 'ecommerce-customer-left-join',
+            'userSql': 'SELECT customer_id, COUNT(*) AS orders, SUM(returned) AS returns FROM ecommerce_orders GROUP BY customer_id ORDER BY customer_id;'
+        })
+        assert alternative.ok and alternative.json()['passed'], alternative.text()
         page.get_by_role('button', name='File Manager', exact=False).click()
         page.get_by_text('Generate a synthetic dataset').click()
         page.get_by_label('Scenario').select_option('payments')

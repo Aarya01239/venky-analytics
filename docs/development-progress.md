@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## E-commerce SQL challenges
+
+- SQL Studio includes four new SQLite exercises using the existing sample e-commerce orders. They cover date filtering, conditional return rates, retaining customers with no returns, and cumulative monthly sales.
+- Each challenge has a starter query, an optional hint, and a reference answer. Chromium verifies hint visibility, rejection of the incomplete query, and successful grading of all four answers. An equivalent aggregation also passes the customer-return challenge.
+
 ## Notebook and spreadsheet shortcuts
 
 - Added eight Jupyter and Google Sheets drills. The trainer now captures Alt combinations, including the Jupyter run-and-insert shortcut and Google Sheets Tool finder. Reserved or clipboard-related combinations use the on-screen simulation.

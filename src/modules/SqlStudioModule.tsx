@@ -544,6 +544,10 @@ export const SqlStudioModule: React.FC = () => {
                 SQL Challenge: {activeChallenge.title} ({activeChallenge.level})
               </div>
               <div className="text-slate-700 dark:text-slate-300">{activeChallenge.prompt}</div>
+              {activeChallenge.hint && <details key={activeChallenge.id}>
+                <summary className="cursor-pointer font-medium">Show hint</summary>
+                <p className="mt-1">{activeChallenge.hint}</p>
+              </details>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
