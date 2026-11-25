@@ -316,7 +316,7 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         browser_ai.on('request', lambda request: browser_ai_requests.append(request.url))
         browser_ai.goto('http://localhost:4317')
         browser_ai.get_by_role('button', name='Analytics Tutor', exact=True).click()
-        browser_ai.get_by_label('Provider', exact=True).select_option('browser')
+        browser_ai.get_by_label('Provider').select_option('browser')
         expect(browser_ai.get_by_text('First load typically downloads about 270 MB', exact=False)).to_be_visible()
         browser_ai.get_by_role('textbox', name='Ask SQL, Excel, Python, Stats, BA, or Telugu explanation...').fill('Explain SQL')
         browser_ai.get_by_role('button', name='Send prompt', exact=True).click()
