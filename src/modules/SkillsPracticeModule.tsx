@@ -64,6 +64,14 @@ function shortcutChord(shortcut: typeof shortcuts[number]) {
   return [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
 }
 
+const difficultyLevels = ['Beginner', 'Intermediate', 'Advanced'] as const;
+type ShortcutDifficulty = typeof difficultyLevels[number];
+
+function difficultyFor(shortcut: typeof shortcuts[number]): ShortcutDifficulty {
+  if (shortcut.reserved) return 'Advanced';
+  return shortcutChord(shortcut).length > 2 ? 'Intermediate' : 'Beginner';
+}
+
 function searchWords(value: string) {
   return value.toLowerCase().replace(/[+\s]+/g, ' ').trim();
 }
@@ -84,6 +92,7 @@ export function SkillsPracticeModule() {
   const [elapsed,setElapsed]=useState(0);
   const [keystrokes, setKeystrokes] = useState({ total: 0, errors: 0 });
   const [shortcutApp, setShortcutApp] = useState('All apps');
+  const [difficulty, setDifficulty] = useState<ShortcutDifficulty | 'All difficulties'>('All difficulties');
   const [shortcutSearch, setShortcutSearch] = useState('');
   const [masteryFilter, setMasteryFilter] = useState<MasteryLevel | 'All levels'>('All levels');
   const [timedStart, setTimedStart] = useState(0);
@@ -120,7 +129,9 @@ export function SkillsPracticeModule() {
     setKeystrokes({ total: 0, errors: 0 });
     drillKeys.current = {};
   }
-  const filteredShortcuts = shortcutApp === 'All apps' ? shortcuts : shortcuts.filter(item => item.app === shortcutApp);
+  const appShortcuts = shortcutApp === 'All apps' ? shortcuts : shortcuts.filter(item => item.app === shortcutApp);
+  const availableDifficulties = new Set(appShortcuts.map(difficultyFor));
+  const filteredShortcuts = difficulty === 'All difficulties' ? appShortcuts : appShortcuts.filter(item => difficultyFor(item) === difficulty);
   const shortcut = filteredShortcuts[index % filteredShortcuts.length];
   const shortcutId = shortcut.app + ' · ' + shortcut.task;
   const shortcutStats = shortcutHistory[shortcutId];
@@ -254,10 +265,18 @@ export function SkillsPracticeModule() {
       <div className="flex flex-wrap items-center gap-3">
         <label>Practice app <select aria-label="Practice app" className="rounded border bg-transparent p-1" value={shortcutApp} onChange={event => {
           setShortcutApp(event.target.value);
+          setDifficulty('All difficulties');
           reset(0);
         }}>
           <option>All apps</option>
           {[...new Set(shortcuts.map(item => item.app))].map(app => <option key={app}>{app}</option>)}
+        </select></label>
+        <label>Difficulty <select aria-label="Shortcut difficulty" className="rounded border bg-transparent p-1" value={difficulty} onChange={event => {
+          setDifficulty(event.target.value as typeof difficulty);
+          reset(0);
+        }}>
+          <option>All difficulties</option>
+          {difficultyLevels.map(level => <option key={level} disabled={!availableDifficulties.has(level)}>{level}</option>)}
         </select></label>
         <button className={button} onClick={() => {
           if (timedStart) {
@@ -276,6 +295,7 @@ export function SkillsPracticeModule() {
         {timedStart > 0 && <span aria-label="Shortcut time remaining">{shortcutSeconds}s</span>}
       </div>
       <p ref={shortcutTask} tabIndex={-1}>{shortcut.app}: {shortcut.task}</p>
+      <p className="text-sm">Difficulty for this shortcut: {difficultyFor(shortcut)}</p>
       <p className="text-sm">Mastery for this shortcut: {masteryFor(shortcutStats)}</p>
       {shortcut.reserved ? <>
         <p className="text-sm">Your browser or operating system may handle this shortcut. Select the keys in order to simulate it.</p>
@@ -321,6 +341,7 @@ export function SkillsPracticeModule() {
       <details className="space-y-3 rounded border p-4">
         <summary className="cursor-pointer font-semibold">Shortcut reference</summary>
         <p className="text-sm">{masteredCount} of {filteredShortcuts.length} shortcuts mastered for {shortcutApp.toLowerCase()}.</p>
+        <p className="text-sm">Beginner uses up to one modifier, Intermediate uses two, and Advanced uses an on-screen simulation for reserved shortcuts.</p>
         <p className="text-sm">A shortcut reaches Mastered after at least five attempts with 80% accuracy or higher.</p>
         <label className="block text-sm">Mastery level <select aria-label="Mastery level" className="rounded border bg-transparent p-1" value={masteryFilter}
           onChange={event => setMasteryFilter(event.target.value as typeof masteryFilter)}>
@@ -337,7 +358,7 @@ export function SkillsPracticeModule() {
               <div>
                 <p className="text-sm font-medium">{item.app} · {item.task}</p>
                 <p className="text-sm">{shortcutChord(item).join(' + ')}{item.reserved ? ' · On-screen simulation' : ''}</p>
-                <p className="text-sm">{masteryOf(item)}</p>
+                <p className="text-sm">{difficultyFor(item)} · {masteryOf(item)}</p>
               </div>
               <button className={button} aria-label={`Practice ${item.app} ${item.task}`} onClick={() => {
                 reset(filteredShortcuts.indexOf(item));

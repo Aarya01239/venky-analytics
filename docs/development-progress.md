@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## Shortcut difficulty
+
+- Shortcut Trainer groups exercises into Beginner (zero or one modifier), Intermediate (two modifiers), and Advanced (reserved shortcut simulation). The difficulty selector scopes the practice sequence, weakest-shortcut review, reference and mastery count.
+- Selecting a different app resets difficulty to All difficulties. Levels with no drills for that app are disabled. Chromium exercises the filtered sequence, reference, weakest-shortcut review and the reset when switching apps.
+
 ## Shortcut mastery
 
 - Shortcut Trainer derives Unpracticed, Learning, and Mastered from this browser's saved attempts. Mastered requires at least five attempts and at least 80% accuracy. The app selector scopes the mastery count, and the searchable reference can be filtered by level.
