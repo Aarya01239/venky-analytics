@@ -1,5 +1,17 @@
 # Development checkpoint
 
+## Voice compatibility
+
+Communication Studio shows whether the browser currently provides Telugu speech and microphone transcription. Telugu status updates as installed voices become available. Browser tests use a simulated voice-list change. Real microphone audio and audible Telugu playback remain device-dependent and unverified.
+
+## Optional open-source browser AI
+
+- Analytics Tutor offers Browser AI using the SmolLM2 135M instruction model through WebLLM. It runs in a browser worker without an API key. It is intended for short English practice questions.
+- The browser checks for HTTPS, WebGPU and 16-bit shader support before fetching the runtime. Users explicitly choose to load the approximately 270 MB model, can cancel setup and can unload memory once finished. WebLLM handles model caching. Auto remains curated practice by default.
+- Chromium covers opt-in UI, the fallback before setup, and an unsupported browser that requests neither runtime nor model files. Hardware-backed inference and cache reuse on a supported device remain unverified.
+- [WebLLM worker implementation](https://github.com/mlc-ai/web-llm/blob/main/src/web_worker.ts)
+- [SmolLM2 model files](https://huggingface.co/mlc-ai/SmolLM2-135M-Instruct-q0f16-MLC/tree/main)
+
 ## Private hosting readiness
 
 - Added a Dockerfile, Railway service health probe, and environment-based workspace sign-in. On Railway, the app requires a writable mounted volume and private credentials before it serves workspace data.

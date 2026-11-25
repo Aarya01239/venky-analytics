@@ -307,6 +307,31 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
         expect(degraded.get_by_role('heading', name='Workspace Initialization Error')).to_be_visible()
         degraded.get_by_role('button', name='Keyboard Skills Lab').click()
         expect(degraded.get_by_text('Type the sample exactly', exact=False)).to_be_visible()
+        browser_ai = browser.new_page()
+        browser_ai.add_init_script("""
+            Object.defineProperty(Navigator.prototype, 'gpu', { configurable: true, get: () => undefined });
+            Object.defineProperty(window.speechSynthesis, 'getVoices', { configurable: true, value: () => [] });
+        """)
+        browser_ai_requests = []
+        browser_ai.on('request', lambda request: browser_ai_requests.append(request.url))
+        browser_ai.goto('http://localhost:4317')
+        browser_ai.get_by_role('button', name='Analytics Tutor', exact=True).click()
+        browser_ai.get_by_label('Provider', exact=True).select_option('browser')
+        expect(browser_ai.get_by_text('First load typically downloads about 270 MB', exact=False)).to_be_visible()
+        browser_ai.get_by_role('textbox', name='Ask SQL, Excel, Python, Stats, BA, or Telugu explanation...').fill('Explain SQL')
+        browser_ai.get_by_role('button', name='Send prompt', exact=True).click()
+        expect(browser_ai.get_by_text('Load the browser model to use Browser AI', exact=False)).to_be_visible()
+        browser_ai.get_by_role('button', name='Load browser model', exact=True).click()
+        expect(browser_ai.get_by_text('Browser AI needs HTTPS and a WebGPU-capable browser.', exact=True)).to_be_visible()
+        assert not any('browserTutor' in url or 'huggingface.co' in url for url in browser_ai_requests)
+        browser_ai.get_by_role('button', name='Close AI panel', exact=True).click()
+        browser_ai.get_by_role('button', name='Communication Studio', exact=True).click()
+        expect(browser_ai.get_by_text('No Telugu voice detected yet.', exact=False)).to_be_visible()
+        browser_ai.evaluate("""
+            Object.defineProperty(window.speechSynthesis, 'getVoices', { value: () => [{lang: 'te-IN'}] });
+            window.speechSynthesis.dispatchEvent(new Event('voiceschanged'));
+        """)
+        expect(browser_ai.get_by_text('Telugu voice detected.', exact=True)).to_be_visible()
         pyodide_assets = os.environ.get('PYODIDE_ASSET_DIR')
         if pyodide_assets:
             notebook = browser.new_page()

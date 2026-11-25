@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRecognition, speak, stopSpeech, type BrowserRecognition } from '../utils/browserSpeech';
+import { createRecognition, speak, stopSpeech, supportsSpeechRecognition, voiceFor, type BrowserRecognition } from '../utils/browserSpeech';
 
 const scenarios = [
   ['Self-introduction', 'Introduce yourself in 60 seconds and explain why you are moving from sales to analytics.', 'Start with your current role, give one verified example, and explain what you want to do next.'],
@@ -41,6 +41,15 @@ export function CommunicationStudioModule() {
   const [rate, setRate] = useState(0.9);
   const [answer, setAnswer] = useState('');
   const [status, setStatus] = useState('');
+  const [teluguAvailable, setTeluguAvailable] = useState(() => Boolean(voiceFor('te')));
+  const microphoneSpeechSupported = supportsSpeechRecognition();
+  useEffect(() => {
+    const synthesis = window.speechSynthesis;
+    const updateVoices = () => setTeluguAvailable(Boolean(voiceFor('te')));
+    updateVoices();
+    synthesis?.addEventListener('voiceschanged', updateVoices);
+    return () => synthesis?.removeEventListener('voiceschanged', updateVoices);
+  }, []);
   const [listening, setListening] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const recognition = useRef<BrowserRecognition | null>(null);
@@ -148,12 +157,16 @@ export function CommunicationStudioModule() {
         <button className={button} disabled={listening} onClick={() => play(prompt)}>Play prompt</button>
         <button className={button} disabled={listening} onClick={() => play('ముందుగా ప్రశ్న వినండి. మీ సమాధానాన్ని ఒక ఉదాహరణతో స్పష్టంగా చెప్పండి.', 'te')}>Telugu guidance</button>
         <button className={button} onClick={stopSpeech}>Stop playback</button>
+        <p className="text-sm">{teluguAvailable ? 'Telugu voice detected.' : 'No Telugu voice detected yet. Telugu text is available below.'}</p>
       </div>
       <p lang="te" className="text-sm">ముందుగా ప్రశ్న వినండి. మీ సమాధానాన్ని ఒక ఉదాహరణతో స్పష్టంగా చెప్పండి.</p>
       <p className="text-sm">Munduga prashna vinandi. Mee samadhananni oka udaharanatho spashtanga cheppandi.</p>
       <label className="text-sm">Playback speed <input type="range" min="0.6" max="1.4" step="0.1" value={rate} onChange={event => setRate(Number(event.target.value))} /></label>
     </div>
     <div className="space-y-2">
+      <p className="text-sm">{microphoneSpeechSupported
+        ? 'This browser supports microphone transcription. Access is checked when you start listening.'
+        : 'Microphone transcription is unavailable in this browser. You can type your answer.'}</p>
       <p className="text-sm">Microphone practice uses turn-by-turn browser transcription, which may use your browser provider's speech service. This app keeps the transcript in this session and does not record audio.</p>
       <button className={button} onClick={() => listening ? recognition.current?.stop() : listen()}>{listening ? 'Stop microphone' : 'Start microphone'}</button>
       <p role="status">{status}</p>

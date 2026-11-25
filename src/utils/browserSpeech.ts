@@ -2,6 +2,11 @@ export function stopSpeech(): void {
   window.speechSynthesis?.cancel();
 }
 
+export function voiceFor(language: 'en' | 'te'): SpeechSynthesisVoice | undefined {
+  return window.speechSynthesis?.getVoices()
+    .find(candidate => candidate.lang.toLowerCase().split(/[-_]/)[0] === language);
+}
+
 export function speak(text: string, language: 'en' | 'te', rate: number, onError: (message: string) => void): void {
   const synthesis = window.speechSynthesis;
   if (!synthesis || typeof SpeechSynthesisUtterance === 'undefined') {
@@ -9,7 +14,7 @@ export function speak(text: string, language: 'en' | 'te', rate: number, onError
     return;
   }
 
-  const voice = synthesis.getVoices().find(candidate => candidate.lang.toLowerCase().split(/[-_]/)[0] === language);
+  const voice = voiceFor(language);
   if (language === 'te' && !voice) {
     onError('A Telugu voice is unavailable on this device right now. Read the Telugu text or try again after browser voices load.');
     return;
@@ -36,11 +41,19 @@ export interface BrowserRecognition {
   abort(): void;
 }
 
-export function createRecognition(): BrowserRecognition | null {
+function recognitionConstructor() {
   const browser = window as Window & {
     SpeechRecognition?: new () => BrowserRecognition;
     webkitSpeechRecognition?: new () => BrowserRecognition;
   };
-  const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
+  return browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
+}
+
+export function supportsSpeechRecognition(): boolean {
+  return Boolean(recognitionConstructor());
+}
+
+export function createRecognition(): BrowserRecognition | null {
+  const Recognition = recognitionConstructor();
   return Recognition ? new Recognition() : null;
 }

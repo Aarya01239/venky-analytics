@@ -6,6 +6,7 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { AiLanguage, AiMode } from '../../types/os';
 
 import { offlinePractice } from '../../utils/offlineTutor';
+import type { BrowserTutor } from '../../utils/browserTutor';
 import { speak, stopSpeech } from '../../utils/browserSpeech';
 
 interface ChatMsg {
@@ -68,7 +69,48 @@ export const GeminiPanel: React.FC = () => {
     clearPendingAiPrompt,
   } = useWorkspace();
 
-  const [provider, setProvider] = useState<'auto' | 'gemini' | 'offline'>('auto');
+  const [provider, setProvider] = useState<'auto' | 'gemini' | 'offline' | 'browser'>('auto');
+  const browserTutor = useRef<BrowserTutor | null>(null);
+  const browserDownload = useRef<AbortController | null>(null);
+  const [browserReady, setBrowserReady] = useState(false);
+  const [browserStatus, setBrowserStatus] = useState('');
+  const [browserLoading, setBrowserLoading] = useState(false);
+
+  useEffect(() => () => {
+    browserDownload.current?.abort();
+    browserTutor.current?.close();
+  }, []);
+
+  async function startBrowserTutor() {
+    if (browserDownload.current || browserTutor.current) return;
+    const controller = new AbortController();
+    browserDownload.current = controller;
+    setBrowserLoading(true);
+    setBrowserStatus('Checking browser and graphics compatibility…');
+    try {
+      const gpu = (navigator as Navigator & {
+        gpu?: { requestAdapter(): Promise<{ features: { has(feature: string): boolean } } | null> };
+      }).gpu;
+      if (!isSecureContext || !gpu) throw new Error('Browser AI needs HTTPS and a WebGPU-capable browser.');
+      const adapter = await gpu.requestAdapter();
+      if (!adapter?.features.has('shader-f16')) throw new Error('This graphics adapter does not support the model’s required WebGPU features.');
+      controller.signal.throwIfAborted();
+      const { loadBrowserTutor } = await import('../../utils/browserTutor');
+      browserTutor.current = await loadBrowserTutor(
+        percent => setBrowserStatus(`Preparing local model · ${percent}%`),
+        controller.signal,
+      );
+      setBrowserReady(true);
+      setBrowserStatus('Browser model ready.');
+    } catch (error) {
+      setBrowserStatus(controller.signal.aborted ? 'Model setup cancelled.' :
+        error instanceof Error ? error.message : 'Could not start Browser AI. Offline practice is still available.');
+    } finally {
+      browserDownload.current = null;
+      setBrowserLoading(false);
+    }
+  }
+
   const [speechStatus, setSpeechStatus] = useState('');
   const [speechRate, setSpeechRate] = useState(0.9);
   const inFlight = useRef(false);
@@ -93,6 +135,39 @@ export const GeminiPanel: React.FC = () => {
     const addReply = (text: string, source: string) => {
       setMessages(prev => [...prev, { id: `m_${Date.now()}`, role: 'model', text, source }]);
     };
+    if (provider === 'browser') {
+      if (!browserTutor.current || aiLanguage !== 'english') {
+        addReply(offlinePractice(aiContext.module, aiLanguage),
+          aiLanguage !== 'english' ? 'Curated exercise · Browser AI is English-only' : 'Curated exercise · Load the browser model to use Browser AI');
+        return;
+      }
+      inFlight.current = true;
+      setSending(true);
+      const engine = browserTutor.current;
+      let timeout = 0;
+      try {
+        const answer = await Promise.race([
+          engine.ask(trimmed, aiContext.module),
+          new Promise<never>((_, reject) => {
+            timeout = window.setTimeout(() => reject(new Error('Browser model timed out.')), 45_000);
+          }),
+        ]);
+        addReply(answer, 'Browser AI · SmolLM2');
+      } catch (error) {
+        engine.close();
+        browserTutor.current = null;
+        setBrowserReady(false);
+        setBrowserStatus(error instanceof Error && error.message === 'Browser model timed out.'
+          ? 'Browser model timed out. Reload it to retry.'
+          : 'Browser model stopped. Reload it to retry.');
+        addReply(offlinePractice(aiContext.module, aiLanguage), 'Browser AI unavailable · curated exercise');
+      } finally {
+        window.clearTimeout(timeout);
+        inFlight.current = false;
+        setSending(false);
+      }
+      return;
+    }
     if (provider !== 'gemini') {
       addReply(offlinePractice(aiContext.module, aiLanguage), 'Offline practice · curated module exercise');
       return;
@@ -178,10 +253,25 @@ export const GeminiPanel: React.FC = () => {
           Provider <select className="ml-2 bg-transparent" value={provider} onChange={event => setProvider(event.target.value as typeof provider)}>
             <option value="auto">Auto (offline)</option>
             <option value="gemini">Gemini (send workspace context)</option>
+            <option value="browser">Browser AI (English)</option>
             <option value="offline">Offline practice</option>
           </select>
         </label>
         <p className="text-xs text-slate-500">Gemini sends context to Google and can use API quota. Auto keeps your practice in this browser.</p>
+        {provider === 'browser' && <div className="space-y-1.5 text-xs">
+          <p>SmolLM2 runs in this browser. First load typically downloads about 270 MB and requires a compatible WebGPU adapter. Use Wi-Fi if your data is limited. Keep answers to simple English practice questions.</p>
+          <div className="flex gap-3">
+            {browserLoading ? <button className="underline" onClick={() => browserDownload.current?.abort()}>Cancel model setup</button>
+              : browserReady ? <button className="underline" disabled={sending} onClick={() => {
+                browserTutor.current?.close();
+                browserTutor.current = null;
+                setBrowserReady(false);
+                setBrowserStatus('Model unloaded. Cached files may be reused next time.');
+              }}>Unload browser model</button>
+                : <button className="underline" onClick={() => void startBrowserTutor()}>Load browser model</button>}
+          </div>
+          {browserStatus && <p role="status">{browserStatus}</p>}
+        </div>}
         <label className="text-xs">Playback speed <input aria-label="Playback speed" type="range" min="0.6" max="1.4" step="0.1" value={speechRate} onChange={event => setSpeechRate(Number(event.target.value))} /></label>
         <button className="ml-2 text-xs underline" onClick={stopSpeech}>Stop playback</button>
         <p role="status" className="text-xs">{speechStatus}</p>

@@ -6,6 +6,7 @@ Versions and license declarations from installed package metadata after the froz
 
 | Package | Version | Declared license |
 |---|---|---|
+| @mlc-ai/web-llm | 0.2.89 | Apache-2.0 |
 | @google/genai | 3.6.1 | Apache-2.0 |
 | @tailwindcss/vite | 4.3.5 | MIT |
 | @types/multer | 2.3.0 | MIT |
