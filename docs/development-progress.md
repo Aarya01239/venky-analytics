@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Shortcut practice by app
+
+- Shortcut Trainer filters practice by app and supports optional ten-second attempts. Starting a timed attempt focuses the keyboard capture area for supported chords. Browser- or system-reserved chords are practiced with the on-screen simulation.
+- A missed deadline counts as an incorrect attempt. Cancelling or switching tasks leaves the unfinished attempt out of history. Successful timed attempts record their response time and show a saved per-shortcut average.
+- Chromium verifies the Jupyter filter, a successful timed Shift+Enter chord, response-time reporting, and a missed deadline in the same history. Shortcut history remains browser-local.
+
 ## Typing goals and progress
 
 - Timed typing has a configurable goal of one to five completed tests per browser-local day. Cancelled and empty tests do not count. Goal and completed count persist independently of the rolling twelve-result list.

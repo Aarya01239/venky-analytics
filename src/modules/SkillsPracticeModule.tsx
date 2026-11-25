@@ -12,7 +12,7 @@ const drills = [
   '=SUMIFS(C2:C100,A2:A100,"North")',
   'The monthly revenue increased by 12 percent.',
 ];
-type KeyCount = { attempts: number; mistakes: number };
+type KeyCount = { attempts: number; mistakes: number; timedCorrect?: number; totalResponseMs?: number };
 type KeyHistory = Record<string, KeyCount>;
 const keyHistoryStorage = 'vos.typing.keys.v1';
 const shortcutHistoryStorage = 'vos.shortcuts.history.v1';
@@ -67,6 +67,10 @@ export function SkillsPracticeModule() {
   const [start,setStart]=useState(0);
   const [elapsed,setElapsed]=useState(0);
   const [keystrokes, setKeystrokes] = useState({ total: 0, errors: 0 });
+  const [shortcutApp, setShortcutApp] = useState('All apps');
+  const [timedStart, setTimedStart] = useState(0);
+  const [shortcutSeconds, setShortcutSeconds] = useState(10);
+  const shortcutArea = useRef<HTMLDivElement>(null);
   const [attempts,setAttempts]=useState(0);
   const [correct,setCorrect]=useState(0);
   const [feedback,setFeedback]=useState('');
@@ -91,13 +95,17 @@ export function SkillsPracticeModule() {
     setStart(0);
     setElapsed(0);
     setFeedback('');
+    setTimedStart(0);
+    setShortcutSeconds(10);
+    setSimulation([]);
     setKeystrokes({ total: 0, errors: 0 });
     drillKeys.current = {};
   }
-  const shortcut = shortcuts[index % shortcuts.length];
+  const filteredShortcuts = shortcutApp === 'All apps' ? shortcuts : shortcuts.filter(item => item.app === shortcutApp);
+  const shortcut = filteredShortcuts[index % filteredShortcuts.length];
   const shortcutId = shortcut.app + ' · ' + shortcut.task;
   const shortcutStats = shortcutHistory[shortcutId];
-  const weakShortcut = shortcuts
+  const weakShortcut = filteredShortcuts
     .map((item, position) => ({ position, stats: shortcutHistory[item.app + ' · ' + item.task] }))
     .filter(({ stats }) => stats?.mistakes)
     .sort((a, b) => b.stats.mistakes / b.stats.attempts - a.stats.mistakes / a.stats.attempts)[0];
@@ -106,20 +114,44 @@ export function SkillsPracticeModule() {
   const [simulation, setSimulation] = useState<string[]>([]);
   useEffect(() => setSimulation([]), [index, mode]);
 
-  function scoreShortcut(ok: boolean) {
+  function scoreShortcut(ok: boolean, expired = false) {
+    const responseMs = timedStart ? Math.max(0, performance.now() - timedStart) : 0;
+    const timedOut = expired || responseMs >= 10_000;
+    const passed = ok && !timedOut;
+    const measured = passed && timedStart > 0;
     setAttempts(value => value + 1);
-    if (ok) setCorrect(value => value + 1);
-    setFeedback(ok ? 'Correct!' : 'Try again.');
+    if (passed) setCorrect(value => value + 1);
+    setFeedback(timedOut ? 'Time is up. Try again.' : measured ? `Correct in ${(responseMs / 1000).toFixed(2)}s` : passed ? 'Correct!' : 'Try again.');
+    setTimedStart(0);
+    if (timedOut) {
+      setShortcutSeconds(0);
+      setSimulation([]);
+    }
     const next = {
       ...shortcutHistory,
       [shortcutId]: {
         attempts: (shortcutStats?.attempts ?? 0) + 1,
-        mistakes: (shortcutStats?.mistakes ?? 0) + Number(!ok),
+        mistakes: (shortcutStats?.mistakes ?? 0) + Number(!passed),
+        timedCorrect: (Number.isSafeInteger(shortcutStats?.timedCorrect) ? shortcutStats.timedCorrect! : 0) + Number(measured),
+        totalResponseMs: (Number.isFinite(shortcutStats?.totalResponseMs) ? shortcutStats.totalResponseMs! : 0) + (measured ? responseMs : 0),
       },
     };
     setShortcutHistory(next);
     try { localStorage.setItem(shortcutHistoryStorage, JSON.stringify(next)); } catch { /* Storage is optional. */ }
   }
+
+  useEffect(() => {
+    if (!timedStart) return;
+    const timer = window.setInterval(() => {
+      const seconds = Math.max(0, Math.ceil((10_000 - performance.now() + timedStart) / 1000));
+      setShortcutSeconds(seconds);
+      if (!seconds) {
+        window.clearInterval(timer);
+        scoreShortcut(false, true);
+      }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [timedStart]);
 
   function updateTyping(value: string) {
     const now = Date.now();
@@ -190,6 +222,30 @@ export function SkillsPracticeModule() {
         </> : <p className="text-sm">Keys with mistakes will appear here after you finish a drill.</p>}
       </section>
     </>:<>
+      <div className="flex flex-wrap items-center gap-3">
+        <label>Practice app <select aria-label="Practice app" className="rounded border bg-transparent p-1" value={shortcutApp} onChange={event => {
+          setShortcutApp(event.target.value);
+          reset(0);
+        }}>
+          <option>All apps</option>
+          {[...new Set(shortcuts.map(item => item.app))].map(app => <option key={app}>{app}</option>)}
+        </select></label>
+        <button className={button} onClick={() => {
+          if (timedStart) {
+            setTimedStart(0);
+            setShortcutSeconds(10);
+            setSimulation([]);
+            setFeedback('Timed attempt cancelled.');
+            return;
+          }
+          setTimedStart(performance.now());
+          setShortcutSeconds(10);
+          setSimulation([]);
+          setFeedback('');
+          shortcutArea.current?.focus();
+        }}>{timedStart ? 'Cancel timed attempt' : 'Start 10-second attempt'}</button>
+        {timedStart > 0 && <span aria-label="Shortcut time remaining">{shortcutSeconds}s</span>}
+      </div>
       <p>{shortcut.app}: {shortcut.task}</p>
       {shortcut.reserved ? <>
         <p className="text-sm">Your browser or operating system may handle this shortcut. Select the keys in order to simulate it.</p>
@@ -205,7 +261,7 @@ export function SkillsPracticeModule() {
         <p>Selected: {simulation.join(' + ') || 'None'}</p>
       </> : <>
         <p className="text-sm">Focus the practice area and press the shortcut. Tab moves focus normally.</p>
-        <div tabIndex={0} aria-label="Shortcut practice area" className="border rounded p-8 focus:ring-2 focus:ring-blue-500" onKeyDown={event => {
+        <div ref={shortcutArea} tabIndex={0} aria-label="Shortcut practice area" className="border rounded p-8 focus:ring-2 focus:ring-blue-500" onKeyDown={event => {
           if (event.repeat || ['Control', 'Shift', 'Alt', 'Meta', 'Tab', 'Escape'].includes(event.key)) return;
           const key = event.key.toLowerCase();
           if (key !== shortcut.key) {
@@ -223,11 +279,14 @@ export function SkillsPracticeModule() {
       <p role="status">{feedback}</p>
       <p>Correct attempts this visit: {correct}/{attempts}</p>
       {shortcutStats && <p>Saved attempts for this shortcut: {shortcutStats.attempts - shortcutStats.mistakes}/{shortcutStats.attempts} correct</p>}
+      {Boolean(shortcutStats?.timedCorrect && Number.isFinite(shortcutStats.totalResponseMs)) && <p>
+        Average successful timed response: {(shortcutStats.totalResponseMs! / shortcutStats.timedCorrect! / 1000).toFixed(2)}s
+      </p>}
       {weakShortcut && <button className={button} onClick={() => {
         reset(weakShortcut.position);
         setSimulation([]);
       }}>Review lowest-accuracy shortcut</button>}
-      <button className={button} onClick={()=>setFeedback(chord.join(' + '))}>Reveal</button>
+      <button className={button} disabled={timedStart > 0} onClick={()=>setFeedback(chord.join(' + '))}>Reveal</button>
       <button className={button} onClick={()=>reset(index+1)}>Next shortcut</button>
     </>}
   </section>;
