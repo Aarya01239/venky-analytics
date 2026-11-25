@@ -8,7 +8,7 @@ A laptop-first, full-stack personal analytics workstation for learning, practici
 - **Backend**: Express + TypeScript (`server.ts`) running on Port 3000 with:
   - **Persistent SQLite Engine (`sql.js`)**: Automatically saved to `data/venky_os.sqlite` on disk. Stores all workspace metadata (`_vos_*` tables) AND real queryable relational datasets.
   - **Unified Dataset Registry**: Any CSV, XLSX, XLS, or JSON uploaded once in File Manager—or cleaned in Data Cleaning Lab—is indexed into SQLite and immediately reusable across SQL Studio, Excel Studio, Python Studio (`/workspace/<table>.csv`), Statistics Lab, Power BI Workspace, Visualization Studio, and Reporting Studio.
-  - **Server-Side Gemini AI Proxy (`/api/ai/assist`)**: Uses `@google/genai` (`gemini-4-hydrogen`) exclusively on the backend. Never exposes `GEMINI_API_KEY` to client code. Supports 5 modes (`Analyst`, `Learn`, `Practice`, `Interview`, `Report`) and `English`, `Telugu (తెలుగు)`, or `Bilingual` responses.
+  - **Server-Side Gemini AI Proxy (`/api/ai/assist`)**: Uses `@google/genai` (`gemini-3.1-flash-lite`) exclusively on the backend. Never exposes `GEMINI_API_KEY` to client code. Supports 5 modes (`Analyst`, `Learn`, `Practice`, `Interview`, `Report`) and `English`, `Telugu (తెలుగు)`, or `Bilingual` responses.
 
 ## Security & Engine Transparency
 
@@ -29,8 +29,28 @@ APP_URL="http://localhost:3000"
 ## Local Development & Deployment
 
 ```bash
-npm install
+bun install --frozen-lockfile
 npm run dev      # Starts Express + Vite middleware on http://localhost:3000
 npm run build    # Production bundle into dist/
 npm run lint     # TypeScript type-check (tsc --noEmit)
+NODE_ENV=production npm start
 ```
+
+
+## Practice studios
+
+Open **Keyboard Skills Lab** or **Communication Studio** from the practice bar. In the keyboard lab, use physical keys for supported shortcuts and on-screen keys for the reserved-key simulation. **Timed Test** offers 30- and 60-second typing sessions with a daily goal and recent WPM comparisons for the selected duration. The goal and results are saved in this browser. **Keys to practice** opens a focused typing drill for mistakes from completed exercises. **Practice app** and **Difficulty** filter shortcut drills. Open **Shortcut reference** to search by app, action or key combination and start the matching drill. Filter by mastery to revisit shortcuts you are still learning. **Start 10-second attempt** measures response time, and **Review lowest-accuracy shortcut** uses this browser’s saved attempts. In the speaking studio, play a prompt, record a transcription turn if supported, and compare the editable text with the rubric. Telugu text is available when the browser cannot play Telugu speech. **Save and end session** keeps the elapsed time and scenario in this browser.
+
+Open **Analytics Tutor** for curated guidance or select **Gemini** to send the active workspace context to the configured API. Gemini API quotas and billing are separate from consumer Gemini subscriptions. Leave the key unset to run without provider access. Select **Browser AI (English)** for optional local inference. The first load is approximately 270 MB on a compatible WebGPU device and starts only after **Load browser model**.
+
+Open **Career Prep** to track job applications on this browser and compare exact phrases across a posting and your resume.
+
+Open **SQL Studio → Challenges** for SQLite exercises on the sample data. Use **Show hint** when available, then **Verify Solution** to check your query output. Verified challenges appear in your saved SQL progress.
+
+In **Python Studio**, use `/workspace/<table>.csv` in a cell to fetch that dataset on demand. Select a dataset and click **Mount active CSV** for paths built dynamically in Python. Scientific packages load when a cell needs them.
+
+Open **File Manager → Generate a synthetic dataset** to create practice JSON locally. Upload the file in File Manager to use it in the analytics modules.
+
+For private hosting with a mounted SQLite volume, see [Railway deployment](docs/railway-deployment.md).
+
+See the [development checkpoint](docs/development-progress.md) for the runtime, measured build sizes, test evidence, hosting requirements and backup instructions. The [acceptance checklist](docs/master-feature-checklist.md) tracks the remaining product work.

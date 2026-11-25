@@ -1,12 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
 
+const tutorModel = 'gemini-3.1-flash-lite';
+
 let cachedClient: GoogleGenAI | null = null;
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw Object.assign(
-      new Error('GEMINI_API_KEY is not configured in server environment variables. Configure it in Settings > Secrets.'),
+      new Error('GEMINI_API_KEY is not configured in server environment variables. Set GEMINI_API_KEY in the hosting service variables to enable the optional tutor.'),
       { statusCode: 503 }
     );
   }
@@ -113,25 +115,18 @@ export async function runGeminiAssistant(req: GeminiAssistRequest): Promise<Gemi
 
   const contents = [...priorTurns, { role: 'user', parts: [{ text: req.prompt }] }];
 
-  // Retry gemini-4-hydrogen with exponential backoff, falling back to gemini-3.1-flash-lite on persistent 503 overload
-  const attempts: { model: string; delayMs: number }[] = [
-    { model: 'gemini-4-hydrogen', delayMs: 0 },
-    { model: 'gemini-4-hydrogen', delayMs: 700 },
-    { model: 'gemini-3.1-flash-lite', delayMs: 300 },
-  ];
-
   let lastError: any = null;
-  for (const step of attempts) {
-    if (step.delayMs > 0) await sleep(step.delayMs);
+  for (const delayMs of [0, 700]) {
+    if (delayMs) await sleep(delayMs);
     try {
       const response = await ai.models.generateContent({
-        model: step.model,
+        model: tutorModel,
         contents,
         config: { systemInstruction },
       });
       return {
         text: response.text || 'No response text was returned by Gemini.',
-        model: step.model,
+        model: tutorModel,
       };
     } catch (err: any) {
       lastError = err;
@@ -144,13 +139,13 @@ export async function runGeminiAssistant(req: GeminiAssistRequest): Promise<Gemi
   const rawMsg = String(lastError?.message || 'Gemini AI request failed.');
   if (rawMsg.includes('API_KEY_INVALID') || rawMsg.includes('PERMISSION_DENIED') || lastError?.status === 403) {
     throw Object.assign(
-      new Error('Gemini API key is invalid or unauthorized. Please check GEMINI_API_KEY in Settings > Secrets.'),
+      new Error('Gemini API key is invalid or unauthorized. Check that GEMINI_API_KEY is valid in the hosting service variables.'),
       { statusCode: 403 }
     );
   }
   if (rawMsg.includes('RESOURCE_EXHAUSTED') || lastError?.status === 429) {
     throw Object.assign(
-      new Error('Gemini API quota exceeded (429). Wait briefly or configure a billing-enabled key in Settings > Secrets.'),
+      new Error('Gemini API quota exceeded (429). Use curated practice and retry after the quota resets.'),
       { statusCode: 429 }
     );
   }

@@ -4,12 +4,21 @@ import initSqlJs from 'sql.js';
 import type { Database } from 'sql.js';
 import { generateSeedDatasets } from './seedData.ts';
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.resolve(process.cwd(), 'data');
+const railwayVolume = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+if (process.env.RAILWAY_ENVIRONMENT_ID && !railwayVolume) {
+  throw new Error('Attach a Railway persistent volume before starting the workspace.');
+}
+const DATA_DIR = path.resolve(railwayVolume || process.env.DATA_DIR || path.join(process.cwd(), 'data'));
 export const DB_PATH = process.env.SQLITE_DB_PATH
   ? path.resolve(process.env.SQLITE_DB_PATH)
   : path.join(DATA_DIR, 'venky_os.sqlite');
+
+if (railwayVolume) {
+  if (!DB_PATH.startsWith(DATA_DIR + path.sep)) {
+    throw new Error('The SQLite database must be stored inside the Railway persistent volume.');
+  }
+  fs.accessSync(DATA_DIR, fs.constants.W_OK);
+}
 
 export function getDbStorageInfo() {
   const exists = fs.existsSync(DB_PATH);
@@ -18,7 +27,7 @@ export function getDbStorageInfo() {
     engine: 'sqlite-wasm-persistent',
     dbFile: path.basename(DB_PATH),
     storageDir: path.dirname(DB_PATH),
-    customVolumeConfigured: Boolean(process.env.SQLITE_DB_PATH || process.env.DATA_DIR),
+    customVolumeConfigured: Boolean(railwayVolume || process.env.SQLITE_DB_PATH || process.env.DATA_DIR),
     fileExists: exists,
     sizeBytes,
   };
@@ -559,6 +568,18 @@ export async function getDb(): Promise<Database> {
   })();
 
   return initPromise;
+}
+
+export async function withReadOnlySnapshot<T>(run: (snapshot: Database) => T): Promise<T> {
+  const db = await getDb();
+  const SQL = await initSqlJs();
+  const snapshot = new SQL.Database(db.export());
+  try {
+    snapshot.run('PRAGMA query_only = ON');
+    return run(snapshot);
+  } finally {
+    snapshot.close();
+  }
 }
 
 export function queryAll(db: Database, sql: string, params: any[] = []): Record<string, any>[] {

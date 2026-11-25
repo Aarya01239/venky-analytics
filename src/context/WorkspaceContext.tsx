@@ -57,6 +57,7 @@ interface WorkspaceContextValue {
   tasks: TaskItem[];
   notes: NoteItem[];
   learningProgress: LearningProgressRecord[];
+  recordLearningProgress: (record: LearningProgressRecord) => void;
   baDocs: BaDocument[];
   portfolioItems: PortfolioItem[];
   notebooks: NotebookRecord[];
@@ -335,6 +336,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         tasks,
         notes,
         learningProgress,
+        recordLearningProgress: record => setLearningProgress(previous => [
+          ...previous.filter(item => item.topic_id !== record.topic_id), record,
+        ]),
         baDocs,
         portfolioItems,
         notebooks,

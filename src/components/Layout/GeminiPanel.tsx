@@ -5,11 +5,15 @@ import { Copy, Check, Send, Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { AiLanguage, AiMode } from '../../types/os';
 
+import { offlinePractice } from '../../utils/offlineTutor';
+import type { BrowserTutor } from '../../utils/browserTutor';
+import { speak, stopSpeech } from '../../utils/browserSpeech';
+
 interface ChatMsg {
   id: string;
   role: 'user' | 'model';
   text: string;
-  error?: boolean;
+  source?: string;
 }
 
 const AI_MODES: { id: AiMode; label: string }[] = [
@@ -65,6 +69,55 @@ export const GeminiPanel: React.FC = () => {
     clearPendingAiPrompt,
   } = useWorkspace();
 
+  const [provider, setProvider] = useState<'auto' | 'gemini' | 'offline' | 'browser'>('auto');
+  const browserTutor = useRef<BrowserTutor | null>(null);
+  const browserDownload = useRef<AbortController | null>(null);
+  const [browserReady, setBrowserReady] = useState(false);
+  const [browserStatus, setBrowserStatus] = useState('');
+  const [browserLoading, setBrowserLoading] = useState(false);
+
+  useEffect(() => () => {
+    browserDownload.current?.abort();
+    browserTutor.current?.close();
+  }, []);
+
+  async function startBrowserTutor() {
+    if (browserDownload.current || browserTutor.current) return;
+    const controller = new AbortController();
+    browserDownload.current = controller;
+    setBrowserLoading(true);
+    setBrowserStatus('Checking browser and graphics compatibility…');
+    try {
+      const gpu = (navigator as Navigator & {
+        gpu?: { requestAdapter(): Promise<{ features: { has(feature: string): boolean } } | null> };
+      }).gpu;
+      if (!isSecureContext || !gpu) throw new Error('Browser AI needs HTTPS and a WebGPU-capable browser.');
+      const adapter = await gpu.requestAdapter();
+      if (!adapter?.features.has('shader-f16')) throw new Error('This graphics adapter does not support the model’s required WebGPU features.');
+      controller.signal.throwIfAborted();
+      const { loadBrowserTutor } = await import('../../utils/browserTutor');
+      browserTutor.current = await loadBrowserTutor(
+        percent => setBrowserStatus(`Preparing local model · ${percent}%`),
+        controller.signal,
+      );
+      setBrowserReady(true);
+      setBrowserStatus('Browser model ready.');
+    } catch (error) {
+      setBrowserStatus(controller.signal.aborted ? 'Model setup cancelled.' :
+        error instanceof Error ? error.message : 'Could not start Browser AI. Offline practice is still available.');
+    } finally {
+      browserDownload.current = null;
+      setBrowserLoading(false);
+    }
+  }
+
+  const [speechStatus, setSpeechStatus] = useState('');
+  const [speechRate, setSpeechRate] = useState(0.9);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!aiOpen) stopSpeech();
+    return stopSpeech;
+  }, [aiOpen]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -73,56 +126,89 @@ export const GeminiPanel: React.FC = () => {
 
   const sendPrompt = async (promptText: string) => {
     const trimmed = promptText.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || inFlight.current) return;
 
     const userMsg: ChatMsg = { id: `u_${Date.now()}`, role: 'user', text: trimmed };
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
     setInput('');
+    const addReply = (text: string, source: string) => {
+      setMessages(prev => [...prev, { id: `m_${Date.now()}`, role: 'model', text, source }]);
+    };
+    if (provider === 'browser') {
+      if (!browserTutor.current || aiLanguage !== 'english') {
+        addReply(offlinePractice(aiContext.module, aiLanguage),
+          aiLanguage !== 'english' ? 'Curated exercise · Browser AI is English-only' : 'Curated exercise · Load the browser model to use Browser AI');
+        return;
+      }
+      inFlight.current = true;
+      setSending(true);
+      const engine = browserTutor.current;
+      let timeout = 0;
+      try {
+        const answer = await Promise.race([
+          engine.ask(trimmed, aiContext.module),
+          new Promise<never>((_, reject) => {
+            timeout = window.setTimeout(() => reject(new Error('Browser model timed out.')), 45_000);
+          }),
+        ]);
+        addReply(answer, 'Browser AI · SmolLM2');
+      } catch (error) {
+        engine.close();
+        browserTutor.current = null;
+        setBrowserReady(false);
+        setBrowserStatus(error instanceof Error && error.message === 'Browser model timed out.'
+          ? 'Browser model timed out. Reload it to retry.'
+          : 'Browser model stopped. Reload it to retry.');
+        addReply(offlinePractice(aiContext.module, aiLanguage), 'Browser AI unavailable · curated exercise');
+      } finally {
+        window.clearTimeout(timeout);
+        inFlight.current = false;
+        setSending(false);
+      }
+      return;
+    }
+    if (provider !== 'gemini') {
+      addReply(offlinePractice(aiContext.module, aiLanguage), 'Offline practice · curated module exercise');
+      return;
+    }
+    inFlight.current = true;
     setSending(true);
 
     try {
       const res = await fetch('/api/ai/assist', {
         method: 'POST',
+        signal: AbortSignal.timeout(25_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: trimmed,
           mode: aiMode,
           language: aiLanguage,
           context: aiContext,
-          history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+          history: messages.filter(message => !message.source || message.source === 'Gemini AI').slice(-6).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Gemini AI request failed.');
       }
-      setMessages((prev) => [
-        ...prev,
-        { id: `m_${Date.now()}`, role: 'model', text: data.text || 'No response received.' },
-      ]);
-    } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `e_${Date.now()}`,
-          role: 'model',
-          text: err?.message || 'Could not reach Gemini AI backend.',
-          error: true,
-        },
-      ]);
+      if (typeof data.text !== 'string' || !data.text.trim()) throw new Error('Empty Gemini response');
+      addReply(data.text, 'Gemini AI');
+    } catch {
+      addReply(offlinePractice(aiContext.module, aiLanguage), 'Gemini unavailable · curated offline exercise');
     } finally {
+      inFlight.current = false;
       setSending(false);
     }
   };
 
   useEffect(() => {
-    if (aiOpen && pendingAiPrompt) {
+    if (aiOpen && pendingAiPrompt && !sending) {
       const p = pendingAiPrompt;
       clearPendingAiPrompt();
       sendPrompt(p);
     }
-  }, [aiOpen, pendingAiPrompt]);
+  }, [aiOpen, pendingAiPrompt, sending]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -139,12 +225,13 @@ export const GeminiPanel: React.FC = () => {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           <h2 className="font-display font-semibold text-sm text-slate-900 dark:text-slate-100">
-            Gemini Analytics Assistant
+            Analytics Tutor
           </h2>
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setMessages([])}
+            disabled={sending}
+            onClick={() => { stopSpeech(); setMessages([]); }}
             title="Clear conversation"
             className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
@@ -162,6 +249,32 @@ export const GeminiPanel: React.FC = () => {
 
       {/* Mode & Language Controls */}
       <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/70 dark:bg-[#0B111A]/60">
+        <label className="block text-xs">
+          Provider <select className="ml-2 bg-transparent" value={provider} onChange={event => setProvider(event.target.value as typeof provider)}>
+            <option value="auto">Auto (offline)</option>
+            <option value="gemini">Gemini (send workspace context)</option>
+            <option value="browser">Browser AI (English)</option>
+            <option value="offline">Offline practice</option>
+          </select>
+        </label>
+        <p className="text-xs text-slate-500">Gemini sends context to Google and can use API quota. Auto keeps your practice in this browser.</p>
+        {provider === 'browser' && <div className="space-y-1.5 text-xs">
+          <p>SmolLM2 runs in this browser. First load typically downloads about 270 MB and requires a compatible WebGPU adapter. Use Wi-Fi if your data is limited. Keep answers to simple English practice questions.</p>
+          <div className="flex gap-3">
+            {browserLoading ? <button className="underline" onClick={() => browserDownload.current?.abort()}>Cancel model setup</button>
+              : browserReady ? <button className="underline" disabled={sending} onClick={() => {
+                browserTutor.current?.close();
+                browserTutor.current = null;
+                setBrowserReady(false);
+                setBrowserStatus('Model unloaded. Cached files may be reused next time.');
+              }}>Unload browser model</button>
+                : <button className="underline" onClick={() => void startBrowserTutor()}>Load browser model</button>}
+          </div>
+          {browserStatus && <p role="status">{browserStatus}</p>}
+        </div>}
+        <label className="text-xs">Playback speed <input aria-label="Playback speed" type="range" min="0.6" max="1.4" step="0.1" value={speechRate} onChange={event => setSpeechRate(Number(event.target.value))} /></label>
+        <button className="ml-2 text-xs underline" onClick={stopSpeech}>Stop playback</button>
+        <p role="status" className="text-xs">{speechStatus}</p>
         <div className="flex items-center gap-1 overflow-x-auto">
           {AI_MODES.map((m) => (
             <button
@@ -223,8 +336,6 @@ export const GeminiPanel: React.FC = () => {
               className={`text-[13px] leading-relaxed ${
                 m.role === 'user'
                   ? 'ml-8 px-3 py-2 rounded-lg bg-blue-600 text-white'
-                  : m.error
-                  ? 'px-3 py-2 rounded-lg border border-red-300 dark:border-red-900/70 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300'
                   : 'text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800/80 pb-3'
               }`}
             >
@@ -232,10 +343,18 @@ export const GeminiPanel: React.FC = () => {
                 <div className="whitespace-pre-wrap">{m.text}</div>
               ) : (
                 <div>
+                  <p className="mb-1 text-xs text-slate-500">{m.source}</p>
                   <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:p-2.5 prose-pre:rounded-md prose-code:text-blue-600 dark:prose-code:text-blue-300 prose-table:text-xs">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                   </div>
-                  <div className="mt-2 flex items-center justify-end">
+                  <div className="mt-2 flex items-center justify-end gap-3">
+                    {([...new Set(m.text.split('\n').filter(line => line.trim()).map(line => /[\u0C00-\u0C7F]/.test(line) ? 'te' : 'en'))] as ('te' | 'en')[]).map(language => (
+                      <button key={language} className="text-xs underline" onClick={() => {
+                        setSpeechStatus('');
+                        const text = m.text.split('\n').filter(line => /[\u0C00-\u0C7F]/.test(line) === (language === 'te')).join('\n');
+                        speak(text, language, speechRate, setSpeechStatus);
+                      }}>{language === 'te' ? 'Play Telugu' : 'Read aloud'}</button>
+                    ))}
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(m.text);

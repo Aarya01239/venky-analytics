@@ -143,7 +143,7 @@ export const TopBar: React.FC = () => {
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Gemini AI</span>
+          <span>Analytics Tutor</span>
         </button>
       </div>
     </header>

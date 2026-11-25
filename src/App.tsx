@@ -7,28 +7,38 @@ import { GeminiPanel } from './components/Layout/GeminiPanel';
 import { GlobalSearchModal } from './components/Layout/GlobalSearchModal';
 
 import { DashboardModule } from './modules/DashboardModule';
-import { LearningModule } from './modules/LearningModule';
-import { SqlStudioModule } from './modules/SqlStudioModule';
-import { ExcelStudioModule } from './modules/ExcelStudioModule';
-import { PythonStudioModule } from './modules/PythonStudioModule';
-import { StatisticsLabModule } from './modules/StatisticsLabModule';
-import { PowerBiWorkspaceModule } from './modules/PowerBiWorkspaceModule';
-import { DataCleaningModule } from './modules/DataCleaningModule';
-import { VisualizationStudioModule } from './modules/VisualizationStudioModule';
-import { BusinessAnalysisModule } from './modules/BusinessAnalysisModule';
-import { DomainAnalyticsModule } from './modules/DomainAnalyticsModule';
-import { AiAutomationModule } from './modules/AiAutomationModule';
-import { ReportingStudioModule } from './modules/ReportingStudioModule';
-import { ProjectsModule } from './modules/ProjectsModule';
-import { InterviewPrepModule } from './modules/InterviewPrepModule';
-import { PortfolioBuilderModule } from './modules/PortfolioBuilderModule';
-import { FileManagerModule } from './modules/FileManagerModule';
-import { NotesResourcesModule, SettingsModule } from './modules/NotesSettingsModule';
+const LearningModule = React.lazy(() => import('./modules/LearningModule').then(m => ({ default: m.LearningModule })));
+const SqlStudioModule = React.lazy(() => import('./modules/SqlStudioModule').then(m => ({ default: m.SqlStudioModule })));
+const ExcelStudioModule = React.lazy(() => import('./modules/ExcelStudioModule').then(m => ({ default: m.ExcelStudioModule })));
+const PythonStudioModule = React.lazy(() => import('./modules/PythonStudioModule').then(m => ({ default: m.PythonStudioModule })));
+const StatisticsLabModule = React.lazy(() => import('./modules/StatisticsLabModule').then(m => ({ default: m.StatisticsLabModule })));
+const PowerBiWorkspaceModule = React.lazy(() => import('./modules/PowerBiWorkspaceModule').then(m => ({ default: m.PowerBiWorkspaceModule })));
+const DataCleaningModule = React.lazy(() => import('./modules/DataCleaningModule').then(m => ({ default: m.DataCleaningModule })));
+const VisualizationStudioModule = React.lazy(() => import('./modules/VisualizationStudioModule').then(m => ({ default: m.VisualizationStudioModule })));
+const BusinessAnalysisModule = React.lazy(() => import('./modules/BusinessAnalysisModule').then(m => ({ default: m.BusinessAnalysisModule })));
+const DomainAnalyticsModule = React.lazy(() => import('./modules/DomainAnalyticsModule').then(m => ({ default: m.DomainAnalyticsModule })));
+const AiAutomationModule = React.lazy(() => import('./modules/AiAutomationModule').then(m => ({ default: m.AiAutomationModule })));
+const ReportingStudioModule = React.lazy(() => import('./modules/ReportingStudioModule').then(m => ({ default: m.ReportingStudioModule })));
+const ProjectsModule = React.lazy(() => import('./modules/ProjectsModule').then(m => ({ default: m.ProjectsModule })));
+const InterviewPrepModule = React.lazy(() => import('./modules/InterviewPrepModule').then(m => ({ default: m.InterviewPrepModule })));
+const PortfolioBuilderModule = React.lazy(() => import('./modules/PortfolioBuilderModule').then(m => ({ default: m.PortfolioBuilderModule })));
+const FileManagerModule = React.lazy(() => import('./modules/FileManagerModule').then(m => ({ default: m.FileManagerModule })));
+const NotesResourcesModule = React.lazy(() => import('./modules/NotesSettingsModule').then(m => ({ default: m.NotesResourcesModule })));
+const SettingsModule = React.lazy(() => import('./modules/NotesSettingsModule').then(m => ({ default: m.SettingsModule })));
+
+const CareerPractice = React.lazy(() => import('./modules/CareerPractice').then(m => ({ default: m.CareerPractice })));
+const CommunicationStudioModule = React.lazy(() => import('./modules/CommunicationStudioModule').then(m => ({ default: m.CommunicationStudioModule })));
+const SkillsPracticeModule = React.lazy(() => import('./modules/SkillsPracticeModule').then(m => ({ default: m.SkillsPracticeModule })));
 
 const WorkstationShell: React.FC = () => {
   const { loading, error, activeModule, refreshWorkspace } = useWorkspace();
 
+  const [practice, setPractice] = React.useState<'keyboard' | 'voice' | 'career' | null>(null);
+  React.useEffect(() => { setPractice(null); }, [activeModule]);
   const renderModule = () => {
+    if (practice === 'career') return <CareerPractice />;
+    if (practice === 'voice') return <CommunicationStudioModule />;
+    if (practice === 'keyboard') return <SkillsPracticeModule />;
     switch (activeModule) {
       case 'dashboard':
         return <DashboardModule />;
@@ -90,6 +100,13 @@ const WorkstationShell: React.FC = () => {
     );
   }
 
+  if (error && practice) {
+    return <div className="h-screen overflow-auto bg-slate-50 dark:bg-[#0B111A] text-slate-900 dark:text-slate-100">
+      <button className="m-4 text-sm underline" onClick={() => setPractice(null)}>Back to connection status</button>
+      <React.Suspense fallback={<p className="p-6">Loading studio…</p>}>{renderModule()}</React.Suspense>
+    </div>;
+  }
+
   if (error) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#0B111A] p-6 text-center gap-3">
@@ -104,6 +121,11 @@ const WorkstationShell: React.FC = () => {
         >
           Retry Connection
         </button>
+        <div className="flex flex-wrap justify-center gap-3 text-sm underline">
+          <button onClick={() => setPractice('keyboard')}>Keyboard Skills Lab</button>
+          <button onClick={() => setPractice('voice')}>Communication Studio</button>
+          <button onClick={() => setPractice('career')}>Career Prep</button>
+        </div>
       </div>
     );
   }
@@ -113,7 +135,14 @@ const WorkstationShell: React.FC = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-y-auto">{renderModule()}</main>
+        <nav aria-label="Practice studios" className="flex flex-wrap gap-4 px-3 py-2 border-b border-slate-300 dark:border-slate-700">
+          <button className="text-sm text-blue-600 dark:text-blue-400" aria-pressed={practice === 'keyboard'} onClick={() => setPractice(value => value === 'keyboard' ? null : 'keyboard')}>Keyboard Skills Lab</button>
+          <button className="text-sm text-blue-600 dark:text-blue-400" aria-pressed={practice === 'voice'} onClick={() => setPractice(value => value === 'voice' ? null : 'voice')}>Communication Studio</button>
+          <button className="text-sm text-blue-600 dark:text-blue-400" aria-pressed={practice === 'career'} onClick={() => setPractice(value => value === 'career' ? null : 'career')}>Career Prep</button>
+        </nav>
+        <main className="flex-1 overflow-y-auto">
+          <React.Suspense fallback={<p className="p-6">Loading studio…</p>}>{renderModule()}</React.Suspense>
+        </main>
       </div>
       <GeminiPanel />
       <GlobalSearchModal />
