@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Typing goals and progress
+
+- Timed typing has a configurable goal of one to five completed tests per browser-local day. Cancelled and empty tests do not count. Goal and completed count persist independently of the rolling twelve-result list.
+- Recent results show a WPM bar and exact accuracy for each test. The selected duration determines the comparison group. The longest bar represents the best recent WPM in that group.
+- Chromium exercises reaching a goal, reload persistence, separate result views by duration, cancellation, and a date rollover while the page remains open.
+
 ## Timed typing follow-up
 
 - Keyboard Skills Lab offers 30- and 60-second timed typing tests. The score uses correct characters at timeout for WPM and counts corrected mistakes in accuracy. The twelve most recent timed results are saved in this browser, separately from regular typing records.
@@ -50,7 +56,7 @@ The available Sites runtime accepts static output or a Worker fetch handler. The
 
 1. Verify Gemini with a user-managed key and exercise the real microphone and Telugu voice on Chrome desktop and Android. Keep the curated approach available without a key.
 2. Verify Pandas and Matplotlib downloads, plots and notebook exports over a live network. Validate additional Excel formulas and workbook persistence.
-3. Extend keyboard practice with daily goals, progress charts and additional passages. Expand the learning, interview, analytics and project modules using the acceptance checklist.
+3. Extend keyboard practice with additional passages, lessons and longer-term progress summaries. Expand the learning, interview, analytics and project modules using the acceptance checklist.
 4. Add private hosting, access controls, rate limits, and a restore rehearsal. Verify deployment before releasing a URL.
 
 

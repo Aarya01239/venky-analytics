@@ -9,6 +9,30 @@ const passages = [
 ];
 const practiceText = Array.from({ length: 12 }, () => passages.join(' ')).join(' ');
 const historyKey = 'vos.typing.timed.v1';
+const goalKey = 'vos.typing.dailyGoal.v1';
+const dailyKey = 'vos.typing.dailyCount.v1';
+const goalOptions = [1, 2, 3, 4, 5];
+
+function practiceDay(date: Date) {
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()].join('-');
+}
+
+function readGoal() {
+  try {
+    const saved = Number(localStorage.getItem(goalKey));
+    if (goalOptions.includes(saved)) return saved;
+  } catch { /* The default goal is available without storage. */ }
+  return 3;
+}
+
+function readDailyCount(history: Result[], day: string) {
+  const recentCount = history.filter(result => practiceDay(new Date(result.date)) === day).length;
+  try {
+    const saved = JSON.parse(localStorage.getItem(dailyKey) ?? 'null');
+    if (saved?.day === day && Number.isSafeInteger(saved.count) && saved.count >= 0) return Math.max(saved.count, recentCount);
+  } catch { /* Recover from recent results if available. */ }
+  return recentCount;
+}
 const durations = [30, 60] as const;
 type Duration = typeof durations[number];
 type Result = { date: string; duration: Duration; wpm: number; accuracy: number };
@@ -30,6 +54,11 @@ export function TimedTypingTest() {
   const [running, setRunning] = useState(false);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
+  const [dailyGoal, setDailyGoal] = useState(readGoal);
+  const [daily, setDaily] = useState(() => {
+    const day = practiceDay(new Date());
+    return { day, count: readDailyCount(history, day) };
+  });
   const [result, setResult] = useState<Result | null>(null);
   const [notice, setNotice] = useState('');
   const editor = useRef<HTMLTextAreaElement>(null);
@@ -59,15 +88,31 @@ export function TimedTypingTest() {
       setResult(completed);
       const next = [completed, ...history].slice(0, 12);
       setHistory(next);
-      try { localStorage.setItem(historyKey, JSON.stringify(next)); }
-      catch { setNotice('This browser could not save the result after reload.'); }
+      const day = practiceDay(new Date(completed.date));
+      const count = Math.max(daily.day === day ? daily.count : 0, readDailyCount(history, day)) + 1;
+      const summary = { day, count };
+      setDaily(summary);
+      try {
+        localStorage.setItem(historyKey, JSON.stringify(next));
+        localStorage.setItem(dailyKey, JSON.stringify(summary));
+      } catch { setNotice('This browser could not save the result after reload.'); }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [running, history]);
+  }, [running, history, daily]);
 
   useEffect(() => {
     if (running) editor.current?.focus();
   }, [running]);
+
+  useEffect(() => {
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    const timer = window.setTimeout(() => {
+      const day = practiceDay(new Date());
+      setDaily({ day, count: readDailyCount(history, day) });
+    }, Math.max(1, midnight.getTime() - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [daily.day, history]);
 
   function start() {
     attempt.current = { endsAt: performance.now() + duration * 1000, duration, value: '', typed: 0, mistakes: 0 };
@@ -91,6 +136,9 @@ export function TimedTypingTest() {
   }
 
   const visibleFrom = Math.max(0, Math.floor(input.length / 80) * 80 - 40);
+  const completedToday = daily.day === practiceDay(new Date()) ? daily.count : 0;
+  const comparable = history.filter(entry => entry.duration === duration);
+  const bestRecent = Math.max(0, ...comparable.map(entry => entry.wpm));
   const action = 'px-3 py-2 rounded border border-slate-400 hover:bg-blue-600 hover:text-white';
 
   return <section className="space-y-4">
@@ -123,11 +171,32 @@ export function TimedTypingTest() {
       onPaste={event => event.preventDefault()} onDrop={event => event.preventDefault()}
       onChange={event => updateInput(event.target.value)} />
     <div role="status">{result && <p>Test complete · {result.wpm} WPM · {result.accuracy}% accuracy</p>}{notice && <p>{notice}</p>}</div>
-    <h3 className="font-semibold">Recent timed results</h3>
-    {history.length ? <ul className="divide-y">
-      {history.map((entry, index) => <li key={entry.date + index} className="py-2 text-sm">
-        {entry.duration}s · {entry.wpm} WPM · {entry.accuracy}% accuracy · <time dateTime={entry.date}>{new Date(entry.date).toLocaleDateString()}</time>
-      </li>)}
-    </ul> : <p className="text-sm">Results will appear here after the first completed test.</p>}
+    <section className="space-y-2 rounded border p-4">
+      <h3 className="font-semibold">Daily practice goal</h3>
+      <label>Tests per day <select aria-label="Tests per day" className="rounded border bg-transparent p-1" value={dailyGoal} onChange={event => {
+        const next = Number(event.target.value);
+        setDailyGoal(next);
+        try { localStorage.setItem(goalKey, String(next)); }
+        catch { setNotice('This browser could not save the goal after reload.'); }
+      }}>
+        {goalOptions.map(goal => <option key={goal} value={goal}>{goal}</option>)}
+      </select></label>
+      <p>{completedToday} of {dailyGoal} timed tests completed today{completedToday >= dailyGoal ? ' · Goal reached' : ''}</p>
+      <progress className="w-full" aria-label="Daily practice progress" max={dailyGoal} value={Math.min(dailyGoal, completedToday)} />
+    </section>
+    <section className="space-y-2">
+      <h3 className="font-semibold">Recent timed results · {duration}s</h3>
+      {comparable.length ? <>
+        <p className="text-sm">Best recent result: {bestRecent} WPM</p>
+        <ul className="divide-y">
+          {comparable.map((entry, index) => <li key={entry.date + index} className="space-y-1 py-2 text-sm">
+            <p>{entry.duration}s · {entry.wpm} WPM · {entry.accuracy}% accuracy · <time dateTime={entry.date}>{new Date(entry.date).toLocaleDateString()}</time></p>
+            <div className="h-2 overflow-hidden rounded bg-slate-200 dark:bg-slate-800" aria-hidden="true">
+              <div className="h-full bg-blue-600 dark:bg-blue-400" style={{ width: `${bestRecent ? entry.wpm / bestRecent * 100 : 0}%` }} />
+            </div>
+          </li>)}
+        </ul>
+      </> : <p className="text-sm">Complete a {duration}-second test to see progress for this duration.</p>}
+    </section>
   </section>;
 }
