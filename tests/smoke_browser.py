@@ -338,6 +338,34 @@ with tempfile.TemporaryDirectory() as data, sync_playwright() as playwright:
             expect(notebook.get_by_role('button', name='Kernel Ready')).to_be_visible(timeout=15000)
             assert len([url for url in requests if '?limit=2000' in url]) == 1
             print('PASS: real Pyodide browser execution, on-demand CSV and reuse', flush=True)
+        server.terminate()
+        server.wait(timeout=10)
+        access_user = 'smoke-user'
+        access_password = 'test-only-password-for-hosted-smoke'
+        env.update(RAILWAY_ENVIRONMENT_ID='test', RAILWAY_VOLUME_MOUNT_PATH=data,
+                   VOS_ACCESS_USER=access_user, VOS_ACCESS_PASSWORD=access_password)
+        server = subprocess.Popen(['node', 'server.ts'], env=env)
+        private_request = browser.new_context(http_credentials={'username': access_user, 'password': access_password}).request
+        for _ in range(60):
+            try:
+                response = private_request.get('http://localhost:4317/healthz', timeout=1000)
+                assert response.status == 204 and not response.body()
+                break
+            except Exception as error:
+                if server.poll() is not None:
+                    raise AssertionError('Private hosted process stopped early') from error
+                time.sleep(.25)
+        else:
+            raise AssertionError('Private hosted process did not start')
+        unauthorized = page.request.get('http://localhost:4317/api/bootstrap')
+        assert unauthorized.status == 401 and 'Basic' in unauthorized.headers['www-authenticate']
+        assert page.request.get('http://localhost:4317/').status == 401
+        authorized = private_request.get('http://localhost:4317/api/bootstrap')
+        assert authorized.ok and any('synthetic_payments' in dataset['name'] for dataset in authorized.json()['datasets'])
+        assert authorized.headers['cache-control'] == 'private, no-store'
+        foreign = private_request.post('http://localhost:4317/api/learning', headers={'Origin': 'https://different.example'}, data={'topic_id': 'foreign'})
+        assert foreign.status == 403
+        print('PASS: authenticated hosted startup, private page/API, public health probe, and persistent-volume restore', flush=True)
         assert not errors, errors
         print('PASS: production boot, Chromium desktop and mobile, typing metrics, timed results and persistence, keyboard chord and simulation, speaking timer, history and text rubric, Gemini SDK unavailable fallback, SQL grouping and grading, an Excel formula, synthetic data download and import, career tracker and keyword review, practice during a bootstrap failure, and SQLite backup restoration', flush=True)
     finally:

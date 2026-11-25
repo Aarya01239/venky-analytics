@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import { privateAccess } from './server/privateAccess.ts';
 import path from 'path';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
@@ -22,6 +23,10 @@ import type { Database } from 'sql.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
+app.disable('x-powered-by');
+app.get('/healthz', (_req, res) => res.status(204).end());
+const authenticate = privateAccess(process.env);
+if (authenticate) app.use(authenticate);
 app.use(express.json({ limit: '15mb' }));
 
 // File upload validation (max 10 MB, strict tabular extensions)

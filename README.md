@@ -51,4 +51,6 @@ In **Python Studio**, use `/workspace/<table>.csv` in a cell to fetch that datas
 
 Open **File Manager → Generate a synthetic dataset** to create practice JSON locally. Upload the file in File Manager to use it in the analytics modules.
 
+For private hosting with a mounted SQLite volume, see [Railway deployment](docs/railway-deployment.md).
+
 See the [development checkpoint](docs/development-progress.md) for the runtime, measured build sizes, test evidence, hosting requirements and backup instructions. The [acceptance checklist](docs/master-feature-checklist.md) tracks the remaining product work.

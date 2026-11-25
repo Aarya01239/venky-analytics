@@ -1,5 +1,11 @@
 # Development checkpoint
 
+## Private hosting readiness
+
+- Added a Dockerfile, Railway service health probe, and environment-based workspace sign-in. On Railway, the app requires a writable mounted volume and private credentials before it serves workspace data.
+- Local production-mode smoke tests cover an unauthenticated health probe, blocked anonymous page and API requests, authenticated access, rejection of a cross-site write, and persistence from a restored test database under the hosted settings.
+- Railway showed a sign-in screen. Container execution on Railway and the public HTTPS endpoint remain unverified. See the [Railway deployment steps](railway-deployment.md).
+
 ## Verified SQL progress
 
 - SQL Studio records a challenge once when the server verifies a matching query result. It shows the total verified and individual badges. Failed attempts do not add progress, and repeating an already verified answer does not change the count.
