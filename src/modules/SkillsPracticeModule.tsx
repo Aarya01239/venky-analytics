@@ -52,6 +52,14 @@ const shortcuts = [
   {app:'Google Docs', task:'Italicize selection', key:'i', ctrl:true, shift:false},
   {app:'Word', task:'Bold selected text', key:'b', ctrl:true, shift:false},
 ];
+const masteryLevels = ['Unpracticed', 'Learning', 'Mastered'] as const;
+type MasteryLevel = typeof masteryLevels[number];
+
+function masteryFor(stats?: KeyCount): MasteryLevel {
+  if (!stats?.attempts) return 'Unpracticed';
+  return stats.attempts >= 5 && (stats.attempts - stats.mistakes) / stats.attempts >= 0.8 ? 'Mastered' : 'Learning';
+}
+
 function shortcutChord(shortcut: typeof shortcuts[number]) {
   return [shortcut.meta ? 'Windows' : '', shortcut.ctrl ? 'Ctrl' : '', shortcut.shift ? 'Shift' : '', shortcut.key.toUpperCase()].filter(Boolean);
 }
@@ -77,6 +85,7 @@ export function SkillsPracticeModule() {
   const [keystrokes, setKeystrokes] = useState({ total: 0, errors: 0 });
   const [shortcutApp, setShortcutApp] = useState('All apps');
   const [shortcutSearch, setShortcutSearch] = useState('');
+  const [masteryFilter, setMasteryFilter] = useState<MasteryLevel | 'All levels'>('All levels');
   const [timedStart, setTimedStart] = useState(0);
   const [shortcutSeconds, setShortcutSeconds] = useState(10);
   const shortcutArea = useRef<HTMLDivElement>(null);
@@ -123,7 +132,10 @@ export function SkillsPracticeModule() {
   const chord = shortcutChord(shortcut);
   const terms = searchWords(shortcutSearch).split(' ').filter(Boolean);
   const combination = shortcutSearch.includes('+') ? [...terms].sort().join(' ') : '';
+  const masteryOf = (item: typeof shortcuts[number]) => masteryFor(shortcutHistory[item.app + ' · ' + item.task]);
+  const masteredCount = filteredShortcuts.filter(item => masteryOf(item) === 'Mastered').length;
   const matchingShortcuts = filteredShortcuts.filter(item => {
+    if (masteryFilter !== 'All levels' && masteryOf(item) !== masteryFilter) return false;
     if (combination) return shortcutChord(item).map(key => key.toLowerCase()).sort().join(' ') === combination;
     const text = searchWords([item.app, item.task, ...shortcutChord(item)].join(' '));
     return terms.every(term => text.includes(term));
@@ -264,6 +276,7 @@ export function SkillsPracticeModule() {
         {timedStart > 0 && <span aria-label="Shortcut time remaining">{shortcutSeconds}s</span>}
       </div>
       <p ref={shortcutTask} tabIndex={-1}>{shortcut.app}: {shortcut.task}</p>
+      <p className="text-sm">Mastery for this shortcut: {masteryFor(shortcutStats)}</p>
       {shortcut.reserved ? <>
         <p className="text-sm">Your browser or operating system may handle this shortcut. Select the keys in order to simulate it.</p>
         <div className="flex flex-wrap gap-2">
@@ -307,6 +320,13 @@ export function SkillsPracticeModule() {
       <button className={button} onClick={()=>reset(index+1)}>Next shortcut</button>
       <details className="space-y-3 rounded border p-4">
         <summary className="cursor-pointer font-semibold">Shortcut reference</summary>
+        <p className="text-sm">{masteredCount} of {filteredShortcuts.length} shortcuts mastered for {shortcutApp.toLowerCase()}.</p>
+        <p className="text-sm">A shortcut reaches Mastered after at least five attempts with 80% accuracy or higher.</p>
+        <label className="block text-sm">Mastery level <select aria-label="Mastery level" className="rounded border bg-transparent p-1" value={masteryFilter}
+          onChange={event => setMasteryFilter(event.target.value as typeof masteryFilter)}>
+          <option>All levels</option>
+          {masteryLevels.map(level => <option key={level}>{level}</option>)}
+        </select></label>
         <label className="block text-sm">Search shortcuts
           <input className="mt-1 block w-full rounded border bg-transparent p-2" type="search" value={shortcutSearch}
             onChange={event => setShortcutSearch(event.target.value)} placeholder="App, action or key combination" />
@@ -317,6 +337,7 @@ export function SkillsPracticeModule() {
               <div>
                 <p className="text-sm font-medium">{item.app} · {item.task}</p>
                 <p className="text-sm">{shortcutChord(item).join(' + ')}{item.reserved ? ' · On-screen simulation' : ''}</p>
+                <p className="text-sm">{masteryOf(item)}</p>
               </div>
               <button className={button} aria-label={`Practice ${item.app} ${item.task}`} onClick={() => {
                 reset(filteredShortcuts.indexOf(item));
@@ -324,7 +345,7 @@ export function SkillsPracticeModule() {
               }}>Practice</button>
             </li>
           ))}
-        </ul> : <p className="text-sm">No matching shortcuts. Try another search or choose All apps.</p>}
+        </ul> : <p className="text-sm">No matching shortcuts. Try another search or change the filters.</p>}
       </details>
     </>}
   </section>;

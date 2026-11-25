@@ -1,5 +1,10 @@
 # Development checkpoint
 
+## Shortcut mastery
+
+- Shortcut Trainer derives Unpracticed, Learning, and Mastered from this browser's saved attempts. Mastered requires at least five attempts and at least 80% accuracy. The app selector scopes the mastery count, and the searchable reference can be filtered by level.
+- Chromium verifies the Learning-to-Mastered transition after five correct attempts, the Mastered filter, and the same level after reload.
+
 ## Shortcut reference
 
 - Shortcut Trainer includes a reference searchable by app, action or a full key combination such as `Ctrl+Shift+L`. The existing app selector scopes the list. Browser- and system-reserved entries identify their on-screen simulation.
